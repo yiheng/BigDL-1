@@ -49,18 +49,21 @@ import scala.reflect.ClassTag
  *
  * @param inputs input nodes
  * @param outputs output nodes
+ * @param context an Array of tensor containing all the weights and biases of this graph,
+ *                used when different nodes of this graph may share the same weight or bias.
  * @tparam T Numeric type. Only support float/double now
  */
 @SerialVersionUID(- 2896121321564992779L)
-class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
-  outputs : Seq[ModuleNode[T]])(implicit ev: TensorNumeric[T])
+class Graph[T: ClassTag](val inputs : Seq[ModuleNode[T]],
+  outputs : Seq[ModuleNode[T]],
+  context: Option[(Array[Tensor[T]], Array[Tensor[T]])] = None)(implicit ev: TensorNumeric[T])
   extends Container[Activity, Activity, T]{
 
   override def updateOutput(input: Activity): Activity = {
     var i = 0
     while(i < executions.length) {
       val node = executions(i)
-      inputsBP(i) = if (node.prevNodes.length == 0) {
+      inputsBP(i) = if (node.prevNodes.isEmpty && !node.element.isInstanceOf[Const[T]]) {
         inputData(node, input)
       } else if (node.prevNodes.length == 1) {
         node.prevNodes.head.element.output.toTensor[T]
@@ -158,6 +161,13 @@ class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
     }
   }
 
+  override def parameters(): (Array[Tensor[T]], Array[Tensor[T]]) = {
+    context match {
+      case None => super.parameters()
+      case Some((weights, gradients)) => (weights, gradients)
+    }
+  }
+
   override def add(module: AbstractModule[_ <: Activity, _ <: Activity, T]): Graph.this.type = {
     throw new IllegalArgumentException("Graph: Please don't use add method in Graph container. " +
       "A graph container should not be changed after it is constructed")
@@ -167,10 +177,10 @@ class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
   // the outputs will be excluded
   private val dummyOutput = new ModuleNode[T](new Dummy[T]())
   outputs.foreach(_ -> dummyOutput)
-  private val backGraph = dummyOutput.graph(reverse = true)
+  val backGraph = dummyOutput.graph(reverse = true)
 
   // Build execution plan
-  private val executions = backGraph.topologySort.filter(!_.element.isInstanceOf[Dummy[T]]).reverse
+  val executions = backGraph.topologySort.filter(!_.element.isInstanceOf[Dummy[T]]).reverse
   modules.appendAll(executions.map(_.element.asInstanceOf[AbstractModule[Activity, Activity, T]]))
 
   // Check all inputs of the graph should be passed in
@@ -180,7 +190,7 @@ class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
   private val gradOutputBP = new Array[Tensor[T]](executions.length)
 
   private def checkRoots : Unit = {
-    val roots = executions.filter(_.prevNodes.size == 0)
+    val roots = executions.filter(_.prevNodes.size == 0).filterNot(_.element.isInstanceOf[Const[T]])
     require(roots.size == inputs.length,
       s"There're ${inputs.length} inputs, but graph has ${roots.size} roots")
     inputs.foreach(n =>
@@ -252,9 +262,11 @@ object Graph {
    * @param output output node
    * @return a graph container
    */
-  def apply[T: ClassTag](input : Array[ModuleNode[T]], output : Array[ModuleNode[T]])
+  def apply[T: ClassTag](input : Array[ModuleNode[T]],
+                         output : Array[ModuleNode[T]],
+                         context: Option[(Array[Tensor[T]], Array[Tensor[T]])] = None)
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
-    new Graph[T](input, output)
+    new Graph[T](input, output, context)
   }
 
   /**
@@ -263,7 +275,8 @@ object Graph {
    * @param output output nodes
    * @return a graph container
    */
-  def apply[T: ClassTag](input : ModuleNode[T], output : Array[ModuleNode[T]])
+  def apply[T: ClassTag](input : ModuleNode[T],
+                         output : Array[ModuleNode[T]])
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
     new Graph[T](Array(input), output)
   }
@@ -274,7 +287,8 @@ object Graph {
    * @param output output node
    * @return a graph container
    */
-  def apply[T: ClassTag](input : Array[ModuleNode[T]], output : ModuleNode[T])
+  def apply[T: ClassTag](input : Array[ModuleNode[T]],
+                         output : ModuleNode[T])
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
     new Graph[T](input, Array(output))
   }
@@ -285,7 +299,8 @@ object Graph {
    * @param output output nodes
    * @return a graph container
    */
-  def apply[T: ClassTag](input : ModuleNode[T], output : ModuleNode[T])
+  def apply[T: ClassTag](input : ModuleNode[T],
+                         output : ModuleNode[T])
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
     new Graph[T](Array(input), Array(output))
   }
@@ -315,7 +330,7 @@ object Input {
   }
 }
 
-private class Dummy[T: ClassTag]()(implicit ev: TensorNumeric[T])
+private[bigdl] class Dummy[T: ClassTag]()(implicit ev: TensorNumeric[T])
   extends AbstractModule[Activity, Tensor[T], T] {
   override def updateOutput(input: Activity): Tensor[T] = null
   override def updateGradInput(input: Activity, gradOutput: Tensor[T]): Activity = null

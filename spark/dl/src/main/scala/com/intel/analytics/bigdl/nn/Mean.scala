@@ -37,16 +37,26 @@ import scala.reflect.ClassTag
 
 @SerialVersionUID(2995626598003841724L)
 class Mean[T: ClassTag](
-  dimension: Int = 1,
-  nInputDims: Int = -1)
-  (implicit ev: TensorNumeric[T]) extends Sum[T](dimension, nInputDims, true) {
+  val dimension: Array[Int] = Array(1),
+  val nInputDims: Int = -1,
+  resize: Boolean = false)
+  (implicit ev: TensorNumeric[T]) extends Sum[T](dimension, nInputDims, true, resize) {
   override def toString: String = s"nn.Mean"
 }
 
 object Mean {
   def apply[@specialized(Float, Double) T: ClassTag](
       dimension: Int = 1,
-      nInputDims: Int = -1)(implicit ev: TensorNumeric[T]) : Mean[T] = {
-    new Mean[T](dimension, nInputDims)
+      nInputDims: Int = -1)(implicit ev: TensorNumeric[T]): Mean[T] = {
+    new Mean[T](Array(dimension), nInputDims)
+  }
+}
+
+object MeanMulDim {
+  def apply[@specialized(Float, Double) T: ClassTag](
+      dimension: Array[Int] = Array(1),
+      nInputDims: Int = -1,
+      resize: Boolean = true)(implicit ev: TensorNumeric[T]) : Mean[T] = {
+    new Mean[T](dimension, nInputDims, resize)
   }
 }

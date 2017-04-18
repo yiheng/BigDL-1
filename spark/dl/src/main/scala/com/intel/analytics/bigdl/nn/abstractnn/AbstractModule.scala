@@ -27,6 +27,7 @@ import org.apache.spark.rdd.RDD
 import com.intel.analytics.bigdl.optim._
 import com.intel.analytics.bigdl.dataset.Sample
 import com.intel.analytics.bigdl.nn.Graph.ModuleNode
+import org.tensorflow.framework.NodeDef
 
 import scala.reflect.ClassTag
 

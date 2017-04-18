@@ -51,7 +51,6 @@ class SqueezeSpec extends TorchSpec {
   }
 
   "A Squeeze()" should "generate correct output and grad" in {
-    torchCheck()
     val layer = new Squeeze[Double]()
     val input = Tensor[Double](1, 1, 2, 2).apply1(_ => Random.nextDouble())
     val gradOutput = Tensor[Double](2, 2).apply1(_ => Random.nextDouble())

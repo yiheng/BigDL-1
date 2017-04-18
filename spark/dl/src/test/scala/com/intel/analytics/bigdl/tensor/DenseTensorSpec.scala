@@ -734,6 +734,31 @@ class DenseTensorSpec extends FlatSpec with Matchers {
     input should be (Tensor[Float](4, 10).fill(1.0f))
   }
 
+  "broadcast add" should "work correclty" in {
+    val input = Tensor[Float](2, 4, 6, 8, 10).zero()
+    val output = Tensor[Float](2, 4, 6, 8, 10)
+    val adder1 = Tensor[Float](1).fill(1.0f)
+    val adder2 = Tensor[Float](10).fill(1.0f)
+    val adder3 = Tensor[Float](8, 10).fill(1.0f)
+    val adder4 = Tensor[Float](6, 8, 10).fill(1.0f)
+    val adder5 = Tensor[Float](4, 6, 8, 10).fill(1.0f)
+    val adder6 = Tensor[Float](2, 4, 6, 8, 10).fill(1.0f)
+
+    input.add(adder1)
+    input should be (output.fill(1.0f))
+    input.add(adder2)
+    input should be (output.fill(2.0f))
+    input.add(adder3)
+    input should be (output.fill(3.0f))
+    input.add(adder4)
+    input should be (output.fill(4.0f))
+    input.add(adder5)
+    input should be (output.fill(5.0f))
+    input.add(adder6)
+    input should be (output.fill(6.0f))
+  }
+
+
   "tensor apply on 1D tensor" should "work correctly" in {
     val a = Tensor[Float](4)
     a.rand()

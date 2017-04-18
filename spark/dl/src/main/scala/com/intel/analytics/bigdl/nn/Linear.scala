@@ -53,12 +53,12 @@ class Linear[T: ClassTag](
   wRegularizer: Regularizer[T] = null,
   bRegularizer: Regularizer[T] = null
 )(implicit ev: TensorNumeric[T]) extends TensorModule[T] {
-  val weight: Tensor[T] = Tensor[T](outputSize, inputSize)
-  val bias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
+  var weight: Tensor[T] = Tensor[T](outputSize, inputSize)
+  var bias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
   val addBuffer: Tensor[T] = Tensor[T]()
 
-  val gradWeight: Tensor[T] = Tensor[T]()
-  val gradBias: Tensor[T] = if (withBias) Tensor[T]() else null
+  var gradWeight: Tensor[T] = Tensor[T]()
+  var gradBias: Tensor[T] = if (withBias) Tensor[T]() else null
   reset()
 
   def setInitMethod(initMethod: InitializationMethod): this.type = {
@@ -103,11 +103,11 @@ class Linear[T: ClassTag](
       }
 
       if (addBuffer.nElement() != nFrame) {
-        addBuffer.resize(Array(nFrame)).fill(ev.fromType[Int](1))
+        addBuffer.resize(Array(nFrame)).fill(ev.one)
       }
 
-      output.addmm(ev.fromType[Int](0), output, ev.fromType[Int](1), input, weight.t)
-      if (withBias) output.addr(ev.fromType[Int](1), addBuffer, bias)
+      output.addmm(ev.zero, output, ev.one, input, weight.t)
+      if (withBias) output.addr(ev.one, addBuffer, bias)
     }
     output
   }

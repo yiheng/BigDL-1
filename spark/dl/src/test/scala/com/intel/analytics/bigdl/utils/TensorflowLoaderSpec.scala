@@ -17,6 +17,9 @@ package com.intel.analytics.bigdl.utils
 
 import java.io.{File => JFile}
 
+import com.intel.analytics.bigdl.nn._
+import com.intel.analytics.bigdl.nn.abstractnn.Activity
+import com.intel.analytics.bigdl.tensor.Tensor
 import org.scalatest.{FlatSpec, Matchers}
 import org.tensorflow.framework.NodeDef
 
@@ -59,7 +62,76 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val path = processPath(resource.getPath()) + JFile.separator + "test.pb"
     val results = TensorflowLoader.parse(path)
     val tfGraph = TensorflowLoader.buildTFGraph(results)
-    TensorflowLoader.buildBigDLModel(tfGraph, Seq(""), Seq(""))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"), Seq("output"))
+    val container = model.asInstanceOf[Graph[Float]]
+    container.modules.length should be(4)
+    RandomGenerator.RNG.setSeed(100)
+    val input = Tensor[Float](4, 1).rand()
+    val output1 = container.forward(input)
+
+    val model2 = Sequential[Float]()
+    val fc1 = Linear[Float](1, 10)
+    fc1.parameters()._1(0).fill(0.2f)
+    fc1.parameters()._1(1).fill(0.1f)
+    model2.add(fc1).add(Tanh())
+
+    val fc2 = Linear[Float](10, 1)
+    fc2.parameters()._1(0).fill(0.2f)
+    fc2.parameters()._1(1).fill(0.1f)
+    model2.add(fc2)
+
+    val output2 = model2.forward(input)
+    output1 should be(output2)
+  }
+
+  "TensorFlow loader" should "be able to load slim alexnetv2" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "alexnet.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("alexnet_v2/fc8/squeezed"))
+    model.forward(Tensor[Float](4, 3, 224, 224).rand())
+  }
+
+  "TensorFlow loader" should "be able to load slim vgga" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "vgga.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("vgg_a/fc8/squeezed"))
+    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+  }
+
+  "TensorFlow loader" should "be able to load slim vgg16" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "vgg16.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("vgg_16/fc8/squeezed"))
+    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+  }
+
+  "TensorFlow loader" should "be able to load slim vgg19" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "vgg19.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("vgg_19/fc8/squeezed"))
+    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+  }
+
+  "TensorFlow loader" should "be able to load slim lenet" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "lenet.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("LeNet/fc4/BiasAdd"))
+    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
   }
 
   private def processPath(path: String): String = {

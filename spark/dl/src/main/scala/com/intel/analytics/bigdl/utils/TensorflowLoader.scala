@@ -77,8 +77,10 @@ object TensorflowLoader{
         if (patternToGraph.get(patternNode).isEmpty) return util.Collections.emptyList()
 
         val graphNode = patternToGraph.get(patternNode).get
+        // Operation type should match
         if (patternNode.element != graphNode.element.getOp) return util.Collections.emptyList()
 
+        // Prev nodes number should be same
         if (patternNode.prevNodes.filter(_.element != nInputPlaceholder).length
           != graphNode.prevNodes.length) {
           return util.Collections.emptyList()
@@ -128,19 +130,19 @@ object TensorflowLoader{
         // converted node, skip
       } else {
         val (module, nodes) = extract(n.graph(reverse = true))
-        require(module.isDefined, "Can not find matched graph")
+        require(module.isDefined, s"Can not find matched graph ${n}")
         val node = new Node(module.get)
         nodes.asScala.foreach(m => {
           convertedNode(m) = node
           nameToNode(m.element.getName) = node
         })
 
-        val hehe = nodes.asScala.map(_.nextNodes).flatten
-
-        val nextNodes = nodes.asScala.map(_.nextNodes).flatten.filter(_.element != null)
+        val nextNodes = nodes.asScala.map(_.nextNodes).flatten
+          .filter(n => n.element != null && convertedNode.contains(n))
           .map(convertedNode(_)).filter(_ != node).toSet
         nextNodes.foreach(node -> _)
-        val preNodes = nodes.asScala.map(_.prevNodes).flatten.filter(_.element != null)
+        val preNodes = nodes.asScala.map(_.prevNodes).flatten
+          .filter(n => n.element != null && convertedNode.contains(n))
           .map(convertedNode(_)).filter(_ != node).toSet
         preNodes.foreach(_ -> node)
       }
@@ -180,7 +182,7 @@ object TensorflowLoader{
   private[bigdl] def parse(graphPrototxt: String) : List[NodeDef] = {
     val f = new java.io.File(graphPrototxt)
     val reader = CodedInputStream.newInstance(new DataInputStream(new FileInputStream(f)))
-    reader.setSizeLimit(128 << 20)
+    reader.setSizeLimit(0x7fffffff)
     require(f.exists(), graphPrototxt + " does not exists")
 
     val graph = GraphDef.parseFrom(reader)

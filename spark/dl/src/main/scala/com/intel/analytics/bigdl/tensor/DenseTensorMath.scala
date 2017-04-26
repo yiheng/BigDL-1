@@ -523,7 +523,7 @@ object DenseTensorMath {
 
   def addr[@specialized(Float, Double) T](r: Tensor[T], beta: T, t: Tensor[T],
     alpha: T, vec1: Tensor[T], vec2: Tensor[T])(implicit ev: TensorNumeric[T]): Tensor[T] = {
-    require(vec1.dim() == 1 && vec2.dim() == 1)
+    require(vec1.dim() == 1 && vec2.dim() == 1, s"Invalid dimension ${vec1.dim()} ${vec2.dim()}")
     require(t.dim() == 2)
     require(t.size(1) == vec1.size(1) && t.size(2) == vec2.size(1))
 

@@ -15,11 +15,12 @@
  */
 package com.intel.analytics.bigdl.utils
 
-import java.nio.ByteBuffer
+import java.nio.{ByteBuffer, ByteOrder}
+import collection.JavaConverters._
 
 import com.intel.analytics.bigdl.nn._
 import com.intel.analytics.bigdl.tensor.{Storage, Tensor}
-import org.tensorflow.framework.{DataType, NodeDef}
+import org.tensorflow.framework.{DataType, NodeDef, TensorProto}
 import TFToBigDL._
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
 
@@ -33,8 +34,7 @@ trait TFToBigDL {
 
 object FullConnectionTF extends TFToBigDL{
   private val graph = {
-    // val add = Node("BiasAdd")
-    val add = Node("Add")
+    val add = Node("BiasAdd")
     val mul = Node("MatMul")
     Node("*") -> mul
     Node("Const") -> Node("Identity") -> mul -> add
@@ -45,47 +45,31 @@ object FullConnectionTF extends TFToBigDL{
 
   override def layer(tfGraph: DirectedGraph[NodeDef])
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val mat = tfGraph.source.prevNodes.filter(node => node.element.getOp.equals("MatMul")).head
-    val biasread = tfGraph.source.prevNodes
-      .filter(node => node.element.getOp.equals("Identity")).head
-    val bias = biasread.prevNodes.filter(node => node.element.getOp.equals("Const")).head
-    val weightread = mat.prevNodes.filter(node => node.element.getOp.equals("Identity")).head
-    val weights = weightread.prevNodes.filter(node => node.element.getOp.equals("Const")).head
+    val bias = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor
+    )
+    val weight = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(0).prevNodes(1).prevNodes(0).element
+        .getAttrMap.get("value").getTensor
+    )
 
-    // get the shape of the bias tensor
-    val biasTensor = bias.element.getAttrMap.get("value").getTensor
-    val biasdim = biasTensor.getTensorShape.getDimCount
-    val biasshape = new Array[Int](biasdim)
-    var biassum = 1
-    for(m <- 0 until biasdim) {
-      biasshape(m) = biasTensor.getTensorShape.getDim(m).getSize.toInt
-      biassum = biasshape(m) * biassum
-    }
-    // get the shape of the weight tensor
-    val weightTensor = weights.element.getAttrMap.get("value").getTensor
-    val weightdim = weightTensor.getTensorShape.getDimCount
-    val weightshape = new Array[Int](weightdim)
-    for(m <- 0 until weightdim) {
-      weightshape(m) = weightTensor.getTensorShape.getDim(m).getSize.toInt
-    }
-
-    val inputSize = weightshape(0)
-    val outputSize = weightshape(1)
-
-    val linearLayer = Linear[Float](inputSize, outputSize)
-    // transpose the matrix maybe not right
-    linearLayer.weight.set(extractParameter(weights.element, weightshape).transpose(1, 2))
-    if(biassum != 1) {
-      linearLayer.bias.set(extractParameter(bias.element, biasshape))
-    } else if (biassum == 1) {
-      // for the case that the full connect layer's output dimension is 1
-      val biasesArray = new Array[Float](1)
-      biasesArray(0) = bias.element.getAttrMap.get("value").getTensor.getFloatVal(0)
-      val biases = Tensor(Storage(biasesArray))
-      linearLayer.bias.set(biases)
-    }
-
+    val linearLayer = Linear[Float](weight.size(1), weight.size(2))
+    linearLayer.weight.copy(weight.transpose(1, 2))
+    linearLayer.bias.copy(bias)
     linearLayer.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object SqueezeTF extends TFToBigDL {
+  private val graph = (Node("*") -> Node("Squeeze")).graph(reverse = true)
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+    : AbstractModule[Activity, Tensor[Float], Float] = {
+    val dims = tfGraph.source.element.getAttrOrThrow("squeeze_dims").getList().getIList()
+      .asScala.map(_.toInt).toArray
+    Squeeze[Float](dims, batchMode = true)
+      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
@@ -104,13 +88,7 @@ object Conv2D extends TFToBigDL{
 
   override def layer(tfGraph: DirectedGraph[NodeDef])
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val conv = tfGraph.source.prevNodes.filter(node => node.element.getOp.equals("Conv2D")).head
-    val biasread = tfGraph.source.prevNodes
-      .filter(node => node.element.getOp.equals("Identity")).head
-    val bias = biasread.prevNodes.filter(node => node.element.getOp.equals("Const")).head
-    val weightread = conv.prevNodes.filter(node => node.element.getOp.equals("Identity")).head
-    val weights = weightread.prevNodes.filter(node => node.element.getOp.equals("Const")).head
-
+    val conv = tfGraph.source.prevNodes(0)
     val strideH = conv.element.getAttrMap.get("strides").getList.getI(2).toInt
     val strideW = conv.element.getAttrMap.get("strides").getList.getI(3).toInt
     var padW = 0
@@ -125,41 +103,28 @@ object Conv2D extends TFToBigDL{
       padH = 0
     }
 
-    // get the shape of the bias tensor
-    val biasTensor = bias.element.getAttrMap.get("value").getTensor
-    val biasdim = biasTensor.getTensorShape.getDimCount
-    val biasshape = new Array[Int](biasdim)
-    for (m <- 0 until biasdim) {
-      biasshape(m) = biasTensor.getTensorShape.getDim(m).getSize.toInt
-    }
-    // get the shape of the weight tensor
-    val weightTensor = weights.element.getAttrMap.get("value").getTensor
-    val weightdim = weightTensor.getTensorShape.getDimCount
-    val weightshape = new Array[Int](weightdim)
-    for (m <- 0 until weightdim) {
-      weightshape(m) = weightTensor.getTensorShape.getDim(m).getSize.toInt
-    }
+    val bias = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor)
 
-    val nInputPlane = weightshape(2)
-    val nOuputPlane = weightshape(3)
-    val kernelH = weightshape(0)
-    val kernelW = weightshape(1)
+    val weights = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(0).prevNodes(1).prevNodes(0)
+        .element.getAttrMap.get("value").getTensor)
+    val nInputPlane = weights.size(3)
+    val nOuputPlane = weights.size(4)
+    val kernelH = weights.size(1)
+    val kernelW = weights.size(2)
 
     val convLayer = SpatialConvolution[Float](
       nInputPlane, nOuputPlane, kernelW, kernelH, strideW, strideH, padW, padH)
-    convLayer.bias.set(extractParameter(bias.element, biasshape))
-    convLayer.weight.set(extractParameter(weights.element, weightshape)
-      .transpose(1, 4).transpose(2, 3))
+    convLayer.bias.copy(bias)
+    convLayer.weight.copy(weights.transpose(1, 4).transpose(2, 3))
     convLayer.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
 object ReluTF extends  TFToBigDL {
   private val graph = {
-    val nodeinput = new Node("*")
-    val nodeRelu = new Node("Relu")
-    nodeinput -> nodeRelu
-    nodeRelu.graph(reverse = true)
+    (Node("*") -> Node("Relu")).graph(reverse = true)
   }
 
   override def topology: DirectedGraph[String] = graph
@@ -172,10 +137,7 @@ object ReluTF extends  TFToBigDL {
 
 object TanhTF extends  TFToBigDL{
   private val graph = {
-    val nodeinput = new Node("*")
-    val nodetanh = new Node("Tanh")
-    nodeinput -> nodetanh
-    nodetanh.graph(reverse = true)
+    (Node("*") -> Node("Tanh")).graph(reverse = true)
   }
 
   override def topology: DirectedGraph[String] = graph
@@ -188,11 +150,9 @@ object TanhTF extends  TFToBigDL{
 
 object ReshapeTF extends TFToBigDL {
   private val graph = {
-    val nodeinput = new Node("*")
-    val nodeReshape = new Node("Reshape")
-    val nodeshape = new Node("Const")
-    nodeinput -> nodeReshape
-    nodeshape -> nodeReshape
+    val nodeReshape = Node("Reshape")
+    Node("*") -> nodeReshape
+    Node("Const") -> nodeReshape
     nodeReshape.graph(reverse = true)
   }
 
@@ -200,28 +160,26 @@ object ReshapeTF extends TFToBigDL {
 
   override def layer(tfGraph: DirectedGraph[NodeDef])
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val shape = tfGraph.source.prevNodes.filter(node => node.element.getOp.equals("Const")).head
-    val sizeTensor = shape.element.getAttrMap.get("value").getTensor
-    val sizedim = sizeTensor.getTensorShape.getDimCount
-    val sizeshape = new Array[Int](sizedim)
-    for (m <- 0 until sizedim) {
-      sizeshape(m) = sizeTensor.getTensorShape.getDim(m).getSize.toInt
-    }
+    val sizes = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(1).element.getAttrMap.get("value").getTensor)
 
-    val sizes = extractParameter(shape.element, sizeshape)
-    val pos = Array(0, 1)
-    val size = Array(sizes(pos).toInt)
-    Reshape[Float](size = size)
+    val batchMode = sizes.valueAt(1) == -1
+    val arraySize = new Array[Int](if (batchMode) sizes.nElement() - 1 else sizes.nElement())
+    var i = if (batchMode) 2 else 1
+    var k = 0
+    while(i <= sizes.nElement()) {
+      arraySize(k) = sizes.valueAt(i).toInt
+      k += 1
+      i += 1
+    }
+    Reshape[Float](size = arraySize, Some(batchMode))
       .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
 object MaxPoolingTF extends TFToBigDL {
   private val graph = {
-    val nodeinput = new Node("*")
-    val nodeMax = new Node("MaxPool")
-    nodeinput -> nodeMax
-    nodeMax.graph(reverse = true)
+    (Node("*") -> Node("MaxPool")).graph(reverse = true)
   }
 
   override def topology: DirectedGraph[String] = graph
@@ -255,10 +213,7 @@ object MaxPoolingTF extends TFToBigDL {
 
 object AvgPoolingTF extends TFToBigDL{
   private val graph = {
-    val nodeinput = new Node("*")
-    val nodeAvg = new Node("AvgPool")
-    nodeinput -> nodeAvg
-    nodeAvg.graph(reverse = true)
+    (Node("*") -> Node("AvgPool")).graph(reverse = true)
   }
   override def topology: DirectedGraph[String] = graph
 
@@ -291,24 +246,19 @@ object AvgPoolingTF extends TFToBigDL{
 
 object DropoutTF extends TFToBigDL{
   private val graph = {
-    val nodeinput = new Node("*")
-    val nodediv = new Node("RealDiv")
-    val nodeP = new Node("Const")
-    val nodeadd = new Node("Add")
-    val noderandom = new Node("Add")
-    val nodemin = new Node("Const")
-    val nodemax = new Node("Const")
-    val nodesub = new Node("Sub")
-    val nodeshape = new Node("Const")
-    val noderandomuniform = new Node("RandomUniform")
-    val nodemul = new Node("Mul")
-    val nodefloor = new Node("Floor")
-    val nodedrop = new Node("Mul")
-    nodeinput -> nodediv -> nodedrop
+    val nodediv = Node("RealDiv")
+    val nodeP = Node("Const")
+    val nodeadd = Node("Add")
+    val noderandom = Node("Add")
+    val nodemin = Node("Const")
+    val nodesub = Node("Sub")
+    val nodemul = Node("Mul")
+    val nodedrop = Node("Mul")
+    Node("*") -> nodediv -> nodedrop
     nodeP -> nodediv
-    nodeP -> nodeadd -> nodefloor -> nodedrop
-    nodeshape -> noderandomuniform -> nodemul -> noderandom -> nodeadd
-    nodemax -> nodesub -> nodemul
+    nodeP -> nodeadd -> Node("Floor") -> nodedrop
+    Node("*") -> Node("Shape") -> Node("RandomUniform") -> nodemul -> noderandom -> nodeadd
+    Node("Const") -> nodesub -> nodemul
     nodemin -> nodesub
     nodemin -> noderandom
     nodedrop.graph(reverse = true)
@@ -318,69 +268,89 @@ object DropoutTF extends TFToBigDL{
 
   override def layer(tfGraph: DirectedGraph[NodeDef])
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val nodefloor = tfGraph.source.prevNodes.filter(node => node.element.getOp.equals("Floor")).head
-    val nodediv = tfGraph.source.prevNodes.filter(node => node.element.getOp.equals("RealDiv")).head
-    val nodeadd = nodefloor.prevNodes.filter(node => node.element.getOp.equals("Add")).head
-    val nodep = nodediv.prevNodes.filter(node => node.element.getOp.equals("Const")).head
+    val keepProp = tfGraph.source.prevNodes(0).prevNodes(1).element
+      .getAttrMap.get("value").getTensor.getFloatVal(0)
 
+    Dropout[Float](keepProp).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
 
-    Dropout[Float](nodep.element.getAttrMap.get("value").getTensor.getFloatVal(0))
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+object Placeholder extends TFToBigDL {
+  private val graph = Node("Placeholder").graph(reverse = true)
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+      : AbstractModule[Activity, Tensor[Float], Float] = {
+    new Input[Float].asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object IdentityTF extends TFToBigDL {
+  private val graph = (Node("*") -> Node("Identity")).graph(reverse = true)
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+    : AbstractModule[Activity, Tensor[Float], Float] = {
+    new Input[Float].asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
 object TFToBigDL {
+
   def patterns : Array[TFToBigDL] = {
     patternList.toArray
   }
 
-  private[utils] def extractParameter(node : NodeDef, shape : Array[Int],
-    bigEndian : Boolean = true)
-      : Tensor[Float] = {
-    val tensor = node.getAttrMap.get("value").getTensor
-    // deal with the MSB and LSB
-    val bf = tensor.getTensorContent
-    val buffer = bf.toByteArray
-    var param = Tensor[Float]
-    if (bigEndian) {
-      var tmp: Byte = 0
-      for (k <- 0 until buffer.length / 4 ) {
-        tmp = buffer(4 * k)
-        buffer(4 * k) = buffer(4 * k + 3)
-        buffer(4 * k + 3) = tmp
-        tmp = buffer(4 * k + 1)
-        buffer(4 * k + 1) = buffer(4 * k + 2)
-        buffer(4 * k + 2) = tmp
+  def bigEndian : Unit = endian = ByteOrder.BIG_ENDIAN
+
+  def littleEndian : Unit = endian = ByteOrder.LITTLE_ENDIAN
+
+  private var endian = ByteOrder.LITTLE_ENDIAN
+
+  private[utils] def toTensor(tfTensor: TensorProto): Tensor[Float] = {
+    require(tfTensor.getDtype == DataType.DT_FLOAT || tfTensor.getDtype == DataType.DT_INT32,
+      s"Data type ${tfTensor.getDtype} is not supported now")
+    val shape = tfTensor.getTensorShape.getDimList.asScala.map(_.getSize.toInt).toArray
+
+    if (shape.product == 1) {
+      if (tfTensor.getDtype == DataType.DT_FLOAT) {
+        return Tensor[Float](T(tfTensor.getFloatVal(0)))
+      } else {
+        return Tensor[Float](T(tfTensor.getIntVal(0)))
       }
     }
-    if (tensor.getDtype == DataType.DT_FLOAT) {
-      val params = ByteBuffer.wrap(buffer).asFloatBuffer
-      if (params.capacity > 0) {
-        val tmp = new Array[Float](params.capacity())
-        for (j <- 0 until params.capacity()) {
-          tmp(j) = params.get(j)
-        }
-        param = Tensor(Storage(tmp)).resize(shape)
+
+    val buffer = ByteBuffer.wrap(tfTensor.getTensorContent.toByteArray)
+    buffer.order(endian)
+
+    if (tfTensor.getDtype == DataType.DT_FLOAT) {
+      val params = buffer.asFloatBuffer
+      val tmp = new Array[Float](params.capacity())
+      var j = 0
+      while(j < params.capacity()) {
+        tmp(j) = params.get(j)
+        j += 1
       }
-    }
-    else if (tensor.getDtype == DataType.DT_INT32) {
-      val params = ByteBuffer.wrap(buffer).asIntBuffer
-      if (params.capacity > 0) {
-        val tmp = new Array[Float](params.capacity())
-        for (j <- 0 until params.capacity()) {
-          tmp(j) = params.get(j)
-        }
-        param = Tensor(Storage(tmp)).resize(shape)
+      Tensor(Storage(tmp), 1, shape)
+    } else {
+      val params = buffer.asIntBuffer
+      val tmp = new Array[Float](params.capacity())
+      var j = 0
+      while(j < params.capacity()) {
+        tmp(j) = params.get(j)
+        j += 1
       }
+      Tensor(Storage(tmp), 1, shape)
     }
-    param
   }
 
   private val patternList : ArrayBuffer[TFToBigDL] = {
     val res = new ArrayBuffer[TFToBigDL]()
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
-      TanhTF, ReluTF, Conv2D
+      TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF
     )
     res
   }

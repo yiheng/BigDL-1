@@ -384,13 +384,37 @@ object ConcatTF extends TFToBigDL{
 
 object TFToBigDL {
 
+  /**
+   * Get the pattern list.
+   * @return
+   */
   def patterns : Array[TFToBigDL] = {
     patternList.toArray
   }
 
+  /**
+   * Switch endianess to big endian. You should do this when you save the model in a big endian
+   * environment. The default endianess is little endian.
+   */
   def bigEndian : Unit = endian = ByteOrder.BIG_ENDIAN
 
+  /**
+   * Switch endianess to little endian. You should do this when you save the model in a little
+   * endian environment. This is the default endianess.
+   */
   def littleEndian : Unit = endian = ByteOrder.LITTLE_ENDIAN
+
+  /**
+   * Register a new mapping from tensor flow operations to BigDL layer. The mapping is defined as
+   * a subclass of TFToBigDL, which defines an operation topology(reversed graph) and how to get
+   * constructor parameters from the topology.
+   * @param pattern
+   */
+  def registerPattern(pattern : TFToBigDL): Unit = {
+    require(pattern.topology.reverse == true, "the topology should be a reversed graph")
+    patternList.append(pattern)
+    sortPattern()
+  }
 
   private var endian = ByteOrder.LITTLE_ENDIAN
 
@@ -398,6 +422,11 @@ object TFToBigDL {
 
   def dataNCHW : Unit = dataFormat = "NCHW"
 
+  /**
+   * Convert a tensorflow tensor proto to BigDL tensor
+   * @param tfTensor
+   * @return
+   */
   private[utils] def toTensor(tfTensor: TensorProto): Tensor[Float] = {
     require(tfTensor.getDtype == DataType.DT_FLOAT || tfTensor.getDtype == DataType.DT_INT32,
       s"Data type ${tfTensor.getDtype} is not supported now")
@@ -435,12 +464,33 @@ object TFToBigDL {
     }
   }
 
-  private val patternList : ArrayBuffer[TFToBigDL] = {
+  private var patternList : ArrayBuffer[TFToBigDL] = {
     val res = new ArrayBuffer[TFToBigDL]()
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
       TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF
     )
     res
+  }
+
+  sortPattern()
+
+  /**
+   * Sort the pattern list to make sure the graph match first should not be a sub-graph of the graph
+   * match later
+   */
+  private def sortPattern() : Unit = {
+    // do not calculate size and edges of a graph every time
+    val topToNNodes = patternList.map(g => g -> g.topology.size).toMap
+    val topToNEdges = patternList.map(g => g -> g.topology.edges).toMap
+    patternList = patternList.sortWith((l, r) => {
+      if (topToNNodes(l) != topToNNodes(r)) {
+        // graph with more nodes comes first
+        topToNNodes(l) > topToNNodes(r)
+      } else {
+        // same node number, graph with more edges come first
+        topToNEdges(l) > topToNEdges(r)
+      }
+    })
   }
 }

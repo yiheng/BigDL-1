@@ -39,6 +39,12 @@ class DirectedGraph[T](val source : Node[T], val reverse : Boolean = false) {
   def size : Int = BFS.size
 
   /**
+   * How many edges in the graph
+   * @return
+   */
+  def edges : Int = BFS.map(_.nextNodes.length).reduce(_ + _)
+
+  /**
    * Topology sort.
    * @return A sequence of sorted graph nodes
    */

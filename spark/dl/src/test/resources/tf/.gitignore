@@ -2,3 +2,4 @@ model/
 freeze_graph.py
 log/
 *.pb
+!test.pb

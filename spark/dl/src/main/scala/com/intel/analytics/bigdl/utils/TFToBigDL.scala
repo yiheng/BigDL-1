@@ -297,6 +297,91 @@ object IdentityTF extends TFToBigDL {
   }
 }
 
+object BatchNormTF extends TFToBigDL{
+  private val graph = {
+    val nodeInput = new Node("*")
+    val nodeMean1 = new Node("Mean")
+    val nodeStopGrad = new Node("StopGradient")
+    val nodeSub1 = new Node("Sub")
+    val nodeSquare = new Node("SquaredDifference")
+    val nodeMeanss = new Node("Sum")
+    val nodeVarss = new Node("Sum")
+    val nodeShape = new Node("Reshape")
+    val nodeDivisor = new Node("Reciprocal")
+    val nodeShiftedMean = new Node("Mul")
+    val nodeMean2 = new Node("Add")
+    val nodeMul1 = new Node("Mul")
+    val nodeVariance = new Node("Sub")
+    val nodeAdd1 = new Node("Add")
+    val nodeMul2 = new Node("Mul")
+    val nodeMul3 = new Node("Mul")
+    val nodeMul4 = new Node("Mul")
+    val nodeSub2 = new Node("Sub")
+    val nodeAdd2 = new Node("Add")
+
+    nodeInput -> nodeMul3 -> nodeAdd2
+    Node("Const") -> Node("Identity") -> nodeSub2
+    nodeInput -> nodeMean1 -> nodeStopGrad -> nodeShape
+    Node("Const") -> nodeMean1
+    nodeInput -> nodeSub1 -> nodeMeanss -> nodeShiftedMean -> nodeMean2 -> nodeMul4
+    nodeStopGrad -> nodeSub1
+    nodeInput -> nodeSquare -> nodeVarss -> nodeMul1 -> nodeVariance
+    nodeStopGrad -> nodeSquare
+    Node("Const") -> nodeDivisor -> nodeShiftedMean -> Node("Square") -> nodeVariance -> nodeAdd1
+    Node("Const") -> nodeMeanss -> nodeDivisor -> nodeMul1
+    Node("Const") -> nodeVarss -> nodeDivisor
+    Node("Const") -> nodeAdd1 -> Node("Rsqrt") -> nodeMul2 -> nodeMul3
+    Node("Const") -> Node("Identity") -> nodeMul2 -> nodeMul4 -> nodeSub2 -> nodeAdd2
+    Node("Const") -> nodeShape -> nodeMean2
+    nodeAdd2.graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val nOutput = tfGraph.source.prevNodes(1).prevNodes(1).prevNodes(1)
+        .prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor.getIntVal(0)
+
+    val bias = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(1).prevNodes(0).prevNodes(0)
+          .element.getAttrMap.get("value").getTensor)
+    val weights = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(1).prevNodes(1).prevNodes(1).prevNodes(0).prevNodes(0)
+        .element.getAttrMap.get("value").getTensor)
+
+    val spatialBatchNorm = SpatialBatchNormalization[Float](nOutput = nOutput)
+    spatialBatchNorm.weight.copy(weights)
+    spatialBatchNorm.bias.copy(bias)
+    spatialBatchNorm.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object ConcatTF extends TFToBigDL{
+  private val graph = {
+    val nodeConcat = new Node("ConcatV2")
+    Node("...") -> nodeConcat
+    (Node("Const") -> nodeConcat).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val inputNumber = tfGraph.source.element.getAttrMap.get("N").getI.toInt
+    val nodeaxis = tfGraph.source.prevNodes(inputNumber)
+    val axis = nodeaxis.element.getAttrMap.get("value").getTensor.getIntVal(0)
+
+    val dataFormatMatch = Map("N" -> 0, "H" -> 2, "w" -> 3, "C" -> 1)
+
+    val dimension = dataFormatMatch(TFToBigDL.dataFormat.charAt(axis).toString)
+    val nInputDims = 4
+
+    new JoinTable[Float](dimension = dimension, nInputDims = nInputDims)
+      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
 object TFToBigDL {
 
   def patterns : Array[TFToBigDL] = {
@@ -308,6 +393,10 @@ object TFToBigDL {
   def littleEndian : Unit = endian = ByteOrder.LITTLE_ENDIAN
 
   private var endian = ByteOrder.LITTLE_ENDIAN
+
+  var dataFormat : String = "NHWC"
+
+  def dataNCHW : Unit = dataFormat = "NCHW"
 
   private[utils] def toTensor(tfTensor: TensorProto): Tensor[Float] = {
     require(tfTensor.getDtype == DataType.DT_FLOAT || tfTensor.getDtype == DataType.DT_INT32,

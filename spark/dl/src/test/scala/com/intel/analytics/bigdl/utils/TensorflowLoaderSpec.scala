@@ -91,7 +91,11 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
       Seq("alexnet_v2/fc8/squeezed"))
-    model.forward(Tensor[Float](4, 3, 224, 224).rand())
+    val input = Tensor[Float](4, 3, 224, 224).rand()
+    val gradient = Tensor[Float](4, 1000).rand()
+    model.forward(input)
+    model.updateGradInput(input, gradient)
+    model.accGradParameters(input, gradient)
   }
 
   "TensorFlow loader" should "be able to load slim vgga" in {

@@ -607,15 +607,15 @@ object DenseTensorMath {
       r.resizeAs(t).copy(t)
     }
 
-    if (mat.stride(1) == 1) {
+    if (mat.stride(2) == 1) {
+      ev.gemv('T', mat.size(2), mat.size(1), alpha, mat.storage().array(), mat.storageOffset() - 1,
+        mat.stride(1), vec.storage().array(), vec.storageOffset() - 1, vec.stride(1), beta,
+        r.storage().array(), r.storageOffset() - 1, r.stride(1))
+    } else if (mat.stride(1) == 1) {
       ev.gemv('N', mat.size(1), mat.size(2), alpha, mat.storage().array(), mat.storageOffset() - 1,
         mat.stride(2), vec.storage().array(), vec.storageOffset() - 1, vec.stride(1), beta,
         r.storage().array(),
         r.storageOffset() - 1, r.stride(1))
-    } else if (mat.stride(2) == 1) {
-      ev.gemv('T', mat.size(2), mat.size(1), alpha, mat.storage().array(), mat.storageOffset() - 1,
-        mat.stride(1), vec.storage().array(), vec.storageOffset() - 1, vec.stride(1), beta,
-        r.storage().array(), r.storageOffset() - 1, r.stride(1))
     } else {
       val cmat = mat.contiguous()
       ev.gemv('T', cmat.size(2), cmat.size(1), alpha, cmat.storage().array(),

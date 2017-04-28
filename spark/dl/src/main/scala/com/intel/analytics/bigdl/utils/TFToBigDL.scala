@@ -15,9 +15,10 @@
  */
 package com.intel.analytics.bigdl.utils
 
+import java.nio.charset.Charset
 import java.nio.{ByteBuffer, ByteOrder}
-import collection.JavaConverters._
 
+import collection.JavaConverters._
 import com.intel.analytics.bigdl.nn._
 import com.intel.analytics.bigdl.tensor.{Storage, Tensor}
 import org.tensorflow.framework.{DataType, NodeDef, TensorProto}
@@ -88,21 +89,21 @@ object Conv2D extends TFToBigDL{
 
   override def layer(tfGraph: DirectedGraph[NodeDef])
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val conv = tfGraph.source.prevNodes(0)
-    val strideH = conv.element.getAttrMap.get("strides").getList.getI(2).toInt
-    val strideW = conv.element.getAttrMap.get("strides").getList.getI(3).toInt
-    var padW = 0
-    var padH = 0
-    if (conv.element.getAttrMap.get("padding").toString.equals("SAME")) {
-      // not support this type right now
-      padW = 0
-      padH = 0
-    }
-    else if (conv.element.getAttrMap.get("padding").toString.equals("VALID")) {
-      padW = 0
-      padH = 0
-    }
+    val attributes = tfGraph.source.prevNodes(0).element.getAttrMap
+    require(attributes.get("strides").getList.getI(0).toInt == 1, s"not support strides on batch")
 
+    val (strideH, strideW) = if (attributes.get("data_format").getS
+      .toString(Charset.defaultCharset()) == "NHWC") {
+      require(attributes.get("strides").getList.getI(3).toInt == 1, s"not support strides on depth")
+      (attributes.get("strides").getList.getI(1).toInt,
+        attributes.get("strides").getList.getI(2).toInt)
+    } else if (attributes.get("data_format").getS.toString(Charset.defaultCharset()) == "NCHW") {
+      require(attributes.get("strides").getList.getI(2).toInt == 1, s"not support strides on depth")
+      (attributes.get("strides").getList.getI(2).toInt,
+        attributes.get("strides").getList.getI(3).toInt)
+    } else {
+      throw new IllegalArgumentException("no supported data format")
+    }
     val bias = TFToBigDL.toTensor(
       tfGraph.source.prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor)
 
@@ -114,8 +115,17 @@ object Conv2D extends TFToBigDL{
     val kernelH = weights.size(1)
     val kernelW = weights.size(2)
 
+    val (pW, pH) =
+      if (attributes.get("padding").getS.toString(Charset.defaultCharset()) == "SAME") {
+        require((kernelW - strideW) % 2 == 0)
+        require((kernelH - strideH) % 2 == 0)
+        ((kernelW - strideW) / 2, (kernelH - strideH) / 2)
+      } else {
+        (0, 0)
+      }
+
     val convLayer = SpatialConvolution[Float](
-      nInputPlane, nOuputPlane, kernelW, kernelH, strideW, strideH, padW, padH)
+      nInputPlane, nOuputPlane, kernelW, kernelH, strideW, strideH, pW, pH)
     convLayer.bias.copy(bias)
     convLayer.weight.copy(weights.transpose(1, 4).transpose(2, 3))
     convLayer.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
@@ -186,28 +196,40 @@ object MaxPoolingTF extends TFToBigDL {
 
   override def layer(tfGraph: DirectedGraph[NodeDef])
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val maxpool = tfGraph.source.element
+    val attributes = tfGraph.source.element.getAttrMap
 
-    val strideH = maxpool.getAttrMap.get("strides").getList.getI(2).toInt
-    val strideW = maxpool.getAttrMap.get("strides").getList.getI(3).toInt
-
-    val ksizeH = maxpool.getAttrMap.get("ksize").getList.getI(2).toInt
-    val ksizeW = maxpool.getAttrMap.get("ksize").getList.getI(3).toInt
-
-    var padW = 0
-    var padH = 0
-    if (maxpool.getAttrMap.get("padding").toString.equals("SAME")) {
-      // not support this type right now
-      padW = 0
-      padH = 0
+    val (strideH, strideW, ksizeH, ksizeW) = if (attributes.get("data_format").getS
+      .toString(Charset.defaultCharset()) == "NHWC") {
+      require(attributes.get("strides").getList.getI(3).toInt == 1, s"not support strides on depth")
+      (
+        attributes.get("strides").getList.getI(1).toInt,
+        attributes.get("strides").getList.getI(2).toInt,
+        attributes.get("ksize").getList.getI(1).toInt,
+        attributes.get("ksize").getList.getI(2).toInt
+      )
+    } else if (attributes.get("data_format").getS.toString(Charset.defaultCharset()) == "NCHW") {
+      require(attributes.get("strides").getList.getI(2).toInt == 1, s"not support strides on depth")
+      (
+        attributes.get("strides").getList.getI(2).toInt,
+        attributes.get("strides").getList.getI(3).toInt,
+        attributes.get("ksize").getList.getI(2).toInt,
+        attributes.get("ksize").getList.getI(3).toInt
+      )
+    } else {
+      throw new IllegalArgumentException("no supported data format")
     }
-    else if (maxpool.getAttrMap.get("padding").toString.equals("VALID")) {
-      padW = 0
-      padH = 0
-    }
 
-    SpatialMaxPooling[Float](ksizeW, ksizeH, strideW, strideH, padW, padH)
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+    val (pW, pH) =
+      if (attributes.get("padding").getS.toString(Charset.defaultCharset()) == "SAME") {
+        require((ksizeW - strideW) % 2 == 0)
+        require((ksizeH - strideH) % 2 == 0)
+        ((ksizeW - strideW) / 2, (ksizeH - strideH) / 2)
+      } else {
+        (0, 0)
+      }
+
+    val maxpool = SpatialMaxPooling[Float](ksizeW, ksizeH, strideW, strideH, pW, pH)
+    maxpool.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
@@ -219,27 +241,39 @@ object AvgPoolingTF extends TFToBigDL{
 
   override def layer(tfGraph: DirectedGraph[NodeDef])
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val avgpool = tfGraph.source.element
+    val attributes = tfGraph.source.element.getAttrMap
 
-    val strideH = avgpool.getAttrMap.get("strides").getList.getI(2).toInt
-    val strideW = avgpool.getAttrMap.get("strides").getList.getI(3).toInt
-
-    val ksizeH = avgpool.getAttrMap.get("ksize").getList.getI(2).toInt
-    val ksizeW = avgpool.getAttrMap.get("ksize").getList.getI(3).toInt
-
-    var padW = 0
-    var padH = 0
-    if (avgpool.getAttrMap.get("padding").toString.equals("SAME")) {
-      // not support this type right now
-      padW = 0
-      padH = 0
+    val (strideH, strideW, ksizeH, ksizeW) = if (attributes.get("data_format").getS
+      .toString(Charset.defaultCharset()) == "NHWC") {
+      require(attributes.get("strides").getList.getI(3).toInt == 1, s"not support strides on depth")
+      (
+        attributes.get("strides").getList.getI(1).toInt,
+        attributes.get("strides").getList.getI(2).toInt,
+        attributes.get("ksize").getList.getI(1).toInt,
+        attributes.get("ksize").getList.getI(2).toInt
+      )
+    } else if (attributes.get("data_format").getS.toString(Charset.defaultCharset()) == "NCHW") {
+      require(attributes.get("strides").getList.getI(2).toInt == 1, s"not support strides on depth")
+      (
+        attributes.get("strides").getList.getI(2).toInt,
+        attributes.get("strides").getList.getI(3).toInt,
+        attributes.get("ksize").getList.getI(2).toInt,
+        attributes.get("ksize").getList.getI(3).toInt
+      )
+    } else {
+      throw new IllegalArgumentException("no supported data format")
     }
-    else if (avgpool.getAttrMap.get("padding").toString.equals("VALID")) {
-      padW = 0
-      padH = 0
-    }
 
-    SpatialAveragePooling[Float](ksizeW, ksizeH, strideW, strideH, padW, padH)
+    val (pW, pH) =
+      if (attributes.get("padding").getS.toString(Charset.defaultCharset()) == "SAME") {
+        require((ksizeW - strideW) % 2 == 0)
+        require((ksizeH - strideH) % 2 == 0)
+        ((ksizeW - strideW) / 2, (ksizeH - strideH) / 2)
+      } else {
+        (0, 0)
+      }
+
+    SpatialAveragePooling[Float](ksizeW, ksizeH, strideW, strideH, pW, pH)
       .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }

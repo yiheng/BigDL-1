@@ -411,7 +411,7 @@ object ConcatTF extends TFToBigDL{
     val dimension = dataFormatMatch(TFToBigDL.dataFormat.charAt(axis).toString)
     val nInputDims = 4
 
-    new JoinTable[Float](dimension = dimension, nInputDims = nInputDims)
+    new JoinTable[Float](dimension = dimension + 1, nInputDims = nInputDims)
       .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }

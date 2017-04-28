@@ -40,5 +40,6 @@ def main():
         sess.run(init)
         checkpointpath = saver.save(sess, dir + '/model/inception_v3.chkp')
         tf.train.write_graph(sess.graph, dir + '/model', 'inception_v3.pbtxt')
+        tf.summary.FileWriter(dir + '/log', sess.graph)
 if __name__ == "__main__":
     main()

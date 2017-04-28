@@ -94,8 +94,7 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val input = Tensor[Float](4, 3, 224, 224).rand()
     val gradient = Tensor[Float](4, 1000).rand()
     model.forward(input)
-    model.updateGradInput(input, gradient)
-    model.accGradParameters(input, gradient)
+    model.backward(input, gradient)
   }
 
   "TensorFlow loader" should "be able to load slim vgga" in {
@@ -105,7 +104,10 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
       Seq("vgg_a/fc8/squeezed"))
-    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+    val input = Tensor[Float](4, 3, 224, 224).rand()
+    val gradient = Tensor[Float](4, 1000).rand()
+    model.forward(input)
+    model.backward(input, gradient)
   }
 
   "TensorFlow loader" should "be able to load slim vgg16" in {
@@ -115,7 +117,10 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
       Seq("vgg_16/fc8/squeezed"))
-    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+    val input = Tensor[Float](4, 3, 224, 224).rand()
+    val gradient = Tensor[Float](4, 1000).rand()
+    model.forward(input)
+    model.backward(input, gradient)
   }
 
   "TensorFlow loader" should "be able to load slim vgg19" in {
@@ -125,7 +130,10 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
       Seq("vgg_19/fc8/squeezed"))
-    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+    val input = Tensor[Float](2, 3, 224, 224).rand()
+    val gradient = Tensor[Float](2, 1000).rand()
+    model.forward(input)
+    model.backward(input, gradient)
   }
 
   "TensorFlow loader" should "be able to load slim lenet" in {
@@ -135,7 +143,10 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
       Seq("LeNet/fc4/BiasAdd"))
-    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+    val input = Tensor[Float](4, 3, 32, 32).rand()
+    val gradient = Tensor[Float](4, 10).rand()
+    model.forward(input)
+    model.backward(input, gradient)
   }
 
   "TensorFlow loader" should "be able to load slim inception_v3" in {
@@ -145,7 +156,10 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
       Seq("InceptionV3/Logits/SpatialSqueeze"))
-    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+    val input = Tensor[Float](2, 3, 299, 299).rand()
+    val gradient = Tensor[Float](2, 1000).rand()
+    model.forward(input)
+    model.backward(input, gradient)
   }
 
   private def processPath(path: String): String = {

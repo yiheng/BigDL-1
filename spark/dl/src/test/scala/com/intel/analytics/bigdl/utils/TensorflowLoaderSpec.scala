@@ -134,6 +134,16 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     // model.forward(Tensor[Float](4, 3, 224, 224).rand())
   }
 
+  "TensorFlow loader" should "be able to load slim inception_v3" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "inception_v3.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("InceptionV3/Logits/SpatialSqueeze"))
+    // model.forward(Tensor[Float](4, 3, 224, 224).rand())
+  }
+
   private def processPath(path: String): String = {
     if (path.contains(":")) {
       path.substring(1)

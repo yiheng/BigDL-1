@@ -80,28 +80,35 @@ object TensorflowLoader{
         // Operation type should match
         if (patternNode.element != graphNode.element.getOp) return util.Collections.emptyList()
 
-        // Prev nodes number should be same
-        if (patternNode.prevNodes.filter(_.element != nInputPlaceholder).length
-          != graphNode.prevNodes.length) {
+        // Prev nodes number should be same except for the Ninput case
+        if (patternNode.prevNodes.length != graphNode.prevNodes.length &&
+          patternNode.prevNodes.filter(_.element == nInputPlaceholder).length == 0) {
           return util.Collections.emptyList()
         }
 
         var i = 0
+        var direction = 0
+        var j = 0
         while (i < patternNode.prevNodes.length) {
           if (patternNode.prevNodes(i).element == nInputPlaceholder) {
-            require(i == patternNode.prevNodes.length - 1,
-              s"invalid define. $nInputPlaceholder must be the last input node")
-            // skip the left input nodes of graphNode
+            require(patternNode.prevNodes.count(_.element == nInputPlaceholder) == 1,
+              s"only support one $nInputPlaceholder ")
+            direction = 1
+            // skip the left input nodes of graphNode,
+            // once we find the placeholder, we start from another side
           } else if (patternNode.prevNodes(i).element == inputPlaceholder) {
             // skip input placeholder
           } else {
-            val pn = patternNode.prevNodes(i)
-            val gn = graphNode.prevNodes(i)
+            val posPattern = { if (direction == 0) i else patternNode.prevNodes.length - 1 - j}
+            val posGraph = { if (direction == 0) i else graphNode.prevNodes.length - 1 - j}
+            val pn = patternNode.prevNodes(posPattern)
+            val gn = graphNode.prevNodes(posGraph)
             if (patternToGraph.keySet.contains(pn)) {
               if (!patternToGraph(pn).eq(gn)) return util.Collections.emptyList()
             } else {
               patternToGraph(pn) = gn
             }
+            if (direction == 1) j+=1
           }
           i += 1
         }
@@ -127,7 +134,7 @@ object TensorflowLoader{
       if (n.element == null) {
         // Dummy node, skip
       } else if (convertedNode.get(n).isDefined) {
-        // converted node, skip
+        // converted node, skipprevious numbe
       } else {
         val (module, nodes) = extract(n.graph(reverse = true))
         require(module.isDefined, s"Can not find matched graph ${n}")

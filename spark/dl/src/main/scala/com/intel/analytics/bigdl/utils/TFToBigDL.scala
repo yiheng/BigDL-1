@@ -439,7 +439,7 @@ object TFToBigDL {
     val res = new ArrayBuffer[TFToBigDL]()
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
-      TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF
+      TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF
     )
     res
   }

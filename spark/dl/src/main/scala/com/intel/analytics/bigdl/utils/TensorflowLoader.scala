@@ -134,7 +134,7 @@ object TensorflowLoader{
       if (n.element == null) {
         // Dummy node, skip
       } else if (convertedNode.get(n).isDefined) {
-        // converted node, skipprevious numbe
+        // converted node, skip
       } else {
         val (module, nodes) = extract(n.graph(reverse = true))
         require(module.isDefined, s"Can not find matched graph ${n}")

@@ -108,7 +108,7 @@ object TensorflowLoader{
             } else {
               patternToGraph(pn) = gn
             }
-            if (direction == 1) j+=1
+            if (direction == 1) j += 1
           }
           i += 1
         }

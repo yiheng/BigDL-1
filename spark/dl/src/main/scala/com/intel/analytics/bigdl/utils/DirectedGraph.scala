@@ -93,7 +93,7 @@ class DirectedGraph[T](val source : Node[T], val reverse : Boolean = false) {
         val node = stack.pop()
         visited.add(node)
         val nextNodes = if (!reverse) node.nextNodes else node.prevNodes
-        nextNodes.filter(!visited.contains(_)).foreach(stack.push(_))
+        nextNodes.filter(!visited.contains(_)).filter(!stack.contains(_)).foreach(stack.push(_))
         node
       }
     }
@@ -117,7 +117,7 @@ class DirectedGraph[T](val source : Node[T], val reverse : Boolean = false) {
         val node = queue.dequeue()
         visited.add(node)
         val nextNodes = if (!reverse) node.nextNodes else node.prevNodes
-        nextNodes.filter(!visited.contains(_)).foreach(queue.enqueue(_))
+        nextNodes.filter(!visited.contains(_)).filter(!queue.contains(_)).foreach(queue.enqueue(_))
         node
       }
     }

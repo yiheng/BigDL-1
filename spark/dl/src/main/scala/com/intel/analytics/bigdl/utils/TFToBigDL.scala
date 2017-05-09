@@ -393,7 +393,7 @@ object BatchNormTF extends TFToBigDL{
 
 object ConcatTF extends TFToBigDL{
   private val graph = {
-    val nodeConcat = new Node("ConcatV2")
+    val nodeConcat = Node("ConcatV2")
     Node("...") -> nodeConcat
     (Node("Const") -> nodeConcat).graph(reverse = true)
   }
@@ -413,6 +413,55 @@ object ConcatTF extends TFToBigDL{
 
     new JoinTable[Float](dimension = dimension + 1, nInputDims = nInputDims)
       .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object AddTF extends  TFToBigDL{
+  private val graph = {
+    val nodeAdd = Node("Add")
+    Node("*") -> nodeAdd
+    (Node("*") -> nodeAdd).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    CAddTable[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object SoftMaxTF extends  TFToBigDL{
+  private val graph = {
+    (Node("*") -> Node("Softmax")).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    SoftMax[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+
+object MulTF extends  TFToBigDL{
+  private val graph = {
+    val nodeMul = Node("Mul")
+    Node("Const") -> nodeMul
+    (Node("*") -> nodeMul).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef])
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val mul = Mul[Float]()
+    val scale = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(0).element.getAttrMap.get("value").getTensor)
+    require(scale.dim() == 1 && scale.size(1) == 1, s"scale must be one number")
+    mul.weight.copy(scale)
+    mul.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
@@ -502,7 +551,8 @@ object TFToBigDL {
     val res = new ArrayBuffer[TFToBigDL]()
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
-      TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF
+      TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF, AddTF,
+      SoftMaxTF, MulTF
     )
     res
   }

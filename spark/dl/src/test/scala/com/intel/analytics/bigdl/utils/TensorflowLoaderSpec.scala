@@ -162,6 +162,46 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     model.backward(input, gradient)
   }
 
+  "TensorFlow loader" should "be able to load slim resnet_v1" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "resnet_v1.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("resnet_v1_101/SpatialSqueeze"))
+    val input = Tensor[Float](5, 3, 224, 224).rand()
+    val gradient = Tensor[Float](5, 1000).rand()
+    model.forward(input)
+    model.backward(input, gradient)
+  }
+
+  "TensorFlow loader" should "be able to load slim overfeat" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "overfeat.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("overfeat/fc8/squeezed"))
+    val input = Tensor[Float](5, 3, 231, 231).rand()
+    val gradient = Tensor[Float](5, 1000).rand()
+    model.forward(input)
+    model.backward(input, gradient)
+  }
+
+  "TensorFlow loader" should "be able to load slim inception_resnet_v2" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "inception_resnet_v2.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("InceptionResnetV2/Logits/Predictions", "InceptionResnetV2/AuxLogits/Logits/BiasAdd"))
+    val input = Tensor[Float](5, 3, 299, 299).rand()
+    val gradient1 = Tensor[Float](5, 1001).rand()
+    val gradient2 = Tensor[Float](5, 1001).rand()
+    model.forward(input)
+    model.backward(input, T(gradient1, gradient2))
+  }
+
   private def processPath(path: String): String = {
     if (path.contains(":")) {
       path.substring(1)

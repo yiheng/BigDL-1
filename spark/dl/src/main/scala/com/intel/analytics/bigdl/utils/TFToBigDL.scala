@@ -25,12 +25,32 @@ import org.tensorflow.framework.{DataType, NodeDef, TensorProto}
 import TFToBigDL._
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 trait TFToBigDL {
   def topology: DirectedGraph[String]
 
-  def layer(tfGraph: DirectedGraph[NodeDef]): (AbstractModule[Activity, Tensor[Float], Float])
+  def layer(tfGraph: DirectedGraph[NodeDef],
+            context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float])
+
+  def getInputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = null
+
+  def getOutputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = {
+    Seq(tfGraph.source)
+  }
+
+  protected def getOrSetTensor(node: NodeDef, context: Context)
+                              (f: Tensor[Float] => Tensor[Float]): Tensor[Float] = {
+    if (context.contains(node)) {
+      context(node)
+    } else {
+      val tensor = f(TFToBigDL.toTensor(node.getAttrMap.get("value").getTensor))
+      context.put(node, tensor)
+      tensor
+    }
+  }
 }
 
 object FullConnectionTF extends TFToBigDL{
@@ -44,20 +64,24 @@ object FullConnectionTF extends TFToBigDL{
   }
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
-    val bias = TFToBigDL.toTensor(
-      tfGraph.source.prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor
-    )
-    val weight = TFToBigDL.toTensor(
-      tfGraph.source.prevNodes(0).prevNodes(1).prevNodes(0).element
-        .getAttrMap.get("value").getTensor
-    )
 
-    val linearLayer = Linear[Float](weight.size(1), weight.size(2))
-    linearLayer.weight.copy(weight.transpose(1, 2))
-    linearLayer.bias.copy(bias)
+    val biasNode = tfGraph.source.prevNodes(1).prevNodes.head.element
+    val weightNode = tfGraph.source.prevNodes.head.prevNodes(1).prevNodes.head.element
+    val bias = getOrSetTensor(biasNode, context)(t => t)
+    val weight = getOrSetTensor(weightNode, context) { t =>
+      t.transpose(1, 2)
+    }
+
+    val linearLayer = Linear[Float](weight.size(2), weight.size(1))
+    linearLayer.weight = weight
+    linearLayer.bias = bias
     linearLayer.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+
+  override def getInputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = {
+    Seq(tfGraph.source.prevNodes.head.prevNodes.head)
   }
 }
 
@@ -65,8 +89,8 @@ object SqueezeTF extends TFToBigDL {
   private val graph = (Node("*") -> Node("Squeeze")).graph(reverse = true)
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
-    : AbstractModule[Activity, Tensor[Float], Float] = {
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+    : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val dims = tfGraph.source.element.getAttrOrThrow("squeeze_dims").getList().getIList()
       .asScala.map(_.toInt).toArray
     Squeeze[Float](dims, batchMode = true)
@@ -87,7 +111,7 @@ object Conv2D extends TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val attributes = tfGraph.source.prevNodes(0).element.getAttrMap
     require(attributes.get("strides").getList.getI(0).toInt == 1, s"not support strides on batch")
@@ -139,7 +163,7 @@ object ReluTF extends  TFToBigDL {
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
     ReLU[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -152,7 +176,7 @@ object TanhTF extends  TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
     Tanh[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -168,7 +192,7 @@ object ReshapeTF extends TFToBigDL {
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val sizes = TFToBigDL.toTensor(
       tfGraph.source.prevNodes(1).element.getAttrMap.get("value").getTensor)
@@ -194,7 +218,7 @@ object MaxPoolingTF extends TFToBigDL {
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val attributes = tfGraph.source.element.getAttrMap
 
@@ -239,7 +263,7 @@ object AvgPoolingTF extends TFToBigDL{
   }
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val attributes = tfGraph.source.element.getAttrMap
 
@@ -300,7 +324,7 @@ object DropoutTF extends TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val keepProp = tfGraph.source.prevNodes(0).prevNodes(1).element
       .getAttrMap.get("value").getTensor.getFloatVal(0)
@@ -314,7 +338,7 @@ object Placeholder extends TFToBigDL {
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : AbstractModule[Activity, Tensor[Float], Float] = {
     new Input[Float].asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -325,7 +349,7 @@ object IdentityTF extends TFToBigDL {
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
     : AbstractModule[Activity, Tensor[Float], Float] = {
     new Input[Float].asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -372,7 +396,7 @@ object BatchNormTF extends TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
   : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val nOutput = tfGraph.source.prevNodes(1).prevNodes(1).prevNodes(1)
         .prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor.getIntVal(0)
@@ -400,7 +424,7 @@ object ConcatTF extends TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
   : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val inputNumber = tfGraph.source.element.getAttrMap.get("N").getI.toInt
     val nodeaxis = tfGraph.source.prevNodes(inputNumber)
@@ -425,7 +449,7 @@ object AddTF extends  TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
   : (AbstractModule[Activity, Tensor[Float], Float]) = {
     CAddTable[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -438,7 +462,7 @@ object SoftMaxTF extends  TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
   : (AbstractModule[Activity, Tensor[Float], Float]) = {
     SoftMax[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -454,7 +478,7 @@ object MulTF extends  TFToBigDL{
 
   override def topology: DirectedGraph[String] = graph
 
-  override def layer(tfGraph: DirectedGraph[NodeDef])
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
   : (AbstractModule[Activity, Tensor[Float], Float]) = {
     val mul = Mul[Float]()
     val scale = TFToBigDL.toTensor(

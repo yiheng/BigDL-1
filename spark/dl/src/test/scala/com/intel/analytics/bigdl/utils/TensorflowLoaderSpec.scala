@@ -18,13 +18,12 @@ package com.intel.analytics.bigdl.utils
 import java.io.{File => JFile}
 
 import com.intel.analytics.bigdl.nn._
-import com.intel.analytics.bigdl.nn.abstractnn.Activity
 import com.intel.analytics.bigdl.tensor.Tensor
 import org.scalatest.{FlatSpec, Matchers}
-import org.tensorflow.framework.NodeDef
 
 @com.intel.analytics.bigdl.tags.Parallel
 class TensorflowLoaderSpec extends FlatSpec with Matchers {
+
   "TensorFlow loader" should "read a list of nodes from pb file" in {
     val resource = getClass().getClassLoader().getResource("tf")
     val path = processPath(resource.getPath()) + JFile.separator + "test.pb"
@@ -82,6 +81,20 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
 
     val output2 = model2.forward(input)
     output1 should be(output2)
+  }
+
+  "Shared weights" should "be the same instance" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "share_weight.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"), Seq("output"))
+    val container = model.asInstanceOf[Graph[Float]]
+    container.modules.length should be(4)
+    val l1 = container.modules(1).asInstanceOf[Linear[Float]]
+    val l2 = container.modules(3).asInstanceOf[Linear[Float]]
+    assert(l1.weight eq l2.weight)
+    assert(l1.bias eq l2.bias)
   }
 
   "TensorFlow loader" should "be able to load slim alexnetv2" in {

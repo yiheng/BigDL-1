@@ -46,8 +46,8 @@ class Linear[T: ClassTag](
   private var initMethod: InitializationMethod = Default,
   withBias: Boolean = true
 )(implicit ev: TensorNumeric[T]) extends TensorModule[T] {
-  val weight: Tensor[T] = Tensor[T](outputSize, inputSize)
-  val bias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
+  var weight: Tensor[T] = Tensor[T](outputSize, inputSize)
+  var bias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
   val addBuffer: Tensor[T] = Tensor[T]()
 
   val gradWeight: Tensor[T] = Tensor[T](outputSize, inputSize)

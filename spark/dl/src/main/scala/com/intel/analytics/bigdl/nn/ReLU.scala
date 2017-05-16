@@ -16,7 +16,12 @@
 
 package com.intel.analytics.bigdl.nn
 
+import com.google.protobuf.ByteString
+import com.google.protobuf.Descriptors.FieldDescriptor
+import com.intel.analytics.bigdl.tensor.{DoubleType, FloatType}
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
+import com.intel.analytics.bigdl.utils.TensorFlowSaver
+import org.tensorflow.framework.{AttrValue, DataType, NodeDef}
 
 import scala.reflect.ClassTag
 
@@ -34,6 +39,18 @@ class ReLU[T: ClassTag](ip: Boolean = false)(
 
   override def toString(): String = {
     s"nn.ReLU"
+  }
+
+  override def toTFDef(inputs: Seq[NodeDef]): Seq[NodeDef] = {
+    val node = NodeDef.newBuilder()
+    node.setOp("Relu")
+    node.setName(this.getName())
+    TensorFlowSaver.addTypeAttr(node, this.getNumericType())
+    inputs.foreach(n => {
+      node.addInput(n.getName)
+    })
+
+    Seq(node.build())
   }
 }
 

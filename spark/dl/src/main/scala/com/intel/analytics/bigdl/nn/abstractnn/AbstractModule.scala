@@ -27,6 +27,7 @@ import org.apache.spark.rdd.RDD
 import com.intel.analytics.bigdl.optim.Predictor
 import com.intel.analytics.bigdl.dataset.Sample
 import com.intel.analytics.bigdl.nn.Graph.ModuleNode
+import org.tensorflow.framework.NodeDef
 
 import scala.reflect.ClassTag
 
@@ -374,6 +375,15 @@ abstract class AbstractModule[A <: Activity: ClassTag, B <: Activity: ClassTag,
     } else {
       None
     }
+  }
+
+  /**
+   * Convert the layer to a tensorflow node
+   * @return Mapped nodedef list, the first is the output node
+   */
+  def toTFDef(inputs: Seq[NodeDef]): Seq[NodeDef] = {
+    throw new NotImplementedError(
+      s"${this.getClass.getName} is not be able to convert to a tensor flow node")
   }
 }
 

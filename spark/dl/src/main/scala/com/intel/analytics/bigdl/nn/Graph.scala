@@ -54,7 +54,7 @@ import scala.reflect.ClassTag
  * @tparam T Numeric type. Only support float/double now
  */
 @SerialVersionUID(- 2896121321564992779L)
-class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
+class Graph[T: ClassTag](val inputs : Seq[ModuleNode[T]],
   outputs : Seq[ModuleNode[T]],
   context: Option[(Array[Tensor[T]], Array[Tensor[T]])] = None)(implicit ev: TensorNumeric[T])
   extends Container[Activity, Activity, T]{
@@ -177,10 +177,10 @@ class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
   // the outputs will be excluded
   private val dummyOutput = new ModuleNode[T](new Dummy[T]())
   outputs.foreach(_ -> dummyOutput)
-  private val backGraph = dummyOutput.graph(reverse = true)
+  val backGraph = dummyOutput.graph(reverse = true)
 
   // Build execution plan
-  private val executions = backGraph.topologySort.filter(!_.element.isInstanceOf[Dummy[T]]).reverse
+  val executions = backGraph.topologySort.filter(!_.element.isInstanceOf[Dummy[T]]).reverse
   modules.appendAll(executions.map(_.element.asInstanceOf[AbstractModule[Activity, Activity, T]]))
 
   // Check all inputs of the graph should be passed in
@@ -330,7 +330,7 @@ object Input {
   }
 }
 
-private class Dummy[T: ClassTag]()(implicit ev: TensorNumeric[T])
+private[bigdl] class Dummy[T: ClassTag]()(implicit ev: TensorNumeric[T])
   extends AbstractModule[Activity, Tensor[T], T] {
   override def updateOutput(input: Activity): Tensor[T] = null
   override def updateGradInput(input: Activity, gradOutput: Tensor[T]): Activity = null

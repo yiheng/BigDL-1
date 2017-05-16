@@ -59,7 +59,7 @@ class MeanSpec extends FlatSpec with BeforeAndAfter with Matchers {
   }
 
   "An Mean(2, 1)" should "generate correct output and grad" in {
-    val layer = new Mean[Double](2, 1)
+    val layer = Mean[Double](2, 1)
     val input = Tensor[Double](2, 2, 2)
     input.apply1(x => randomn())
     val gradOutput = Tensor[Double](1, 2, 2)

@@ -269,8 +269,8 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
       Seq("resnet_v1_101/SpatialSqueeze"))
-    val input = Tensor[Float](5, 3, 224, 224).rand()
-    val gradient = Tensor[Float](5, 1000).rand()
+    val input = Tensor[Float](2, 3, 224, 224).rand()
+    val gradient = Tensor[Float](2, 1000).rand()
     model.forward(input)
     model.backward(input, gradient)
   }

@@ -33,20 +33,21 @@ object TensorflowLoaderSpec {
   private val input2: Tensor[Float] = Tensor[Float](Storage[Float](data2))
   private val nodeNumber = 4
   private val coreNumber = 4
-  Engine.init
+
+  Engine.init(nodeNumber, coreNumber, true)
 
   private val batchSize = 2 * coreNumber
 
   private val prepareData: Int => (MiniBatch[Float]) = index => {
     val input = Tensor[Float]().resize(batchSize, 10)
-    val target = Tensor[Float]().resize(batchSize, 10)
+    val target = Tensor[Float]().resize(batchSize)
     var i = 0
     while (i < batchSize) {
       if (i % 2 == 0) {
-        target.select(1, i + 1).copy(input1)
+        target.setValue(i + 1, 0.0f)
         input.select(1, i + 1).copy(input1)
       } else {
-        target.select(1, i + 1).copy(input2)
+        target.setValue(i + 1, 0.1f)
         input.select(1, i + 1).copy(input2)
       }
       i += 1

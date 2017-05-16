@@ -16,7 +16,7 @@
 package com.intel.analytics.bigdl.nn
 
 import com.intel.analytics.bigdl.nn.abstractnn.TensorModule
-import com.intel.analytics.bigdl.tensor.Tensor
+import com.intel.analytics.bigdl.tensor.{Storage, Tensor}
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 
 import scala.reflect.ClassTag
@@ -36,50 +36,67 @@ import scala.reflect.ClassTag
  *                   If it is more than the dimension of input tensors, the first dimension
  *                   would be considered as batch size
  * @param sizeAverage default is false, if it is true, it will return the mean instead
+ * @param resize default is false, if it is true, it will resize the dimension to 1, for example
+ *               if it is false, sum 2*2*2 on dimension 3 will be 2*2
+ *               while if it is true the result size will be 2*2*1
  */
 
 @SerialVersionUID(- 8025422596092583688L)
 class Sum[T: ClassTag](
-  dimension: Int = 1,
+  dimension: Array[Int] = Array(1),
   nInputDims: Int = -1,
-  sizeAverage: Boolean = false)
+  sizeAverage: Boolean = false,
+  resize: Boolean = false)
   (implicit ev: TensorNumeric[T]) extends TensorModule[T] {
   @transient
   private var _gradOutput: Tensor[T] = null
 
-  private def getPositiveDimension(input: Tensor[T]): Int = {
-    var dimension = this.dimension
-    if (dimension < 0) {
-      dimension = input.dim() + dimension + 1
-    }
+  private def getPositiveDimension(input: Tensor[T]): Array[Int] = {
+    val dimensions = this.dimension.map(dim => {
+      var dimension = dim
+      if (dimension < 0) {
+        dimension = input.dim() + dimension + 1
+      }
 
-    if (nInputDims > 0 && input.dim() == (nInputDims + 1)) {
-      dimension += 1
-    }
-
-    require(input.dim() >= dimension, "dimension exceeds input dimensions")
-    dimension
+      if (nInputDims > 0 && input.dim() == (nInputDims + 1)) {
+        dimension += 1
+      }
+      require(input.dim() >= dimension, "dimension exceeds input dimensions")
+      dimension
+    })
+    dimensions
   }
 
+  var outputSize = Storage[Int]()
+
   override def updateOutput(input: Tensor[T]): Tensor[T] = {
-    val dimension = getPositiveDimension(input)
-    output.sum(input, dimension)
-
-    if (sizeAverage) {
-      output.div(ev.fromType[Int](input.size(dimension)))
-    }
-    if (output.nDimension() > 1) {
-      output.set(output.select(dimension, 1))
-    }
-
+    val dimensions = getPositiveDimension(input)
+    var tempinput = input
+    outputSize.resize(input.dim()).copy(Storage(input.size()))
+    dimensions.foreach(dimension => {
+      output.sum(tempinput, dimension)
+      if (sizeAverage) {
+        output.div(ev.fromType[Int](input.size(dimension)))
+      }
+      if (output.nDimension() > 1) {
+        output.set(output.select(dimension, 1))
+        if (resize) {
+          outputSize.update(dimension-1, 1)
+          output.resize(outputSize.array())
+        }
+      }
+      tempinput = output
+    })
     output
   }
 
   override def updateGradInput(input: Tensor[T], gradOutput: Tensor[T]): Tensor[T] = {
-    val dimension = getPositiveDimension(input)
+    val dimensions = getPositiveDimension(input)
     val size = input.size()
-    size(dimension - 1) = 1
 
+    dimensions.foreach(dimension => {
+      size(dimension - 1) = 1
+    })
     if (!gradOutput.isContiguous()) {
       _gradOutput = gradOutput.clone().view(size)
     } else {
@@ -88,7 +105,7 @@ class Sum[T: ClassTag](
     gradInput.resizeAs(input)
     gradInput.copy(_gradOutput.expandAs(input))
     if (sizeAverage) {
-      gradInput.div(ev.fromType[Int](input.size(dimension)))
+      dimensions.foreach(dimension => gradInput.div(ev.fromType[Int](input.size(dimension))))
     }
     gradInput
   }
@@ -100,7 +117,18 @@ object Sum {
   def apply[@specialized(Float, Double) T: ClassTag](
       dimension: Int = 1,
       nInputDims: Int = -1,
-      sizeAverage: Boolean = false)(implicit ev: TensorNumeric[T]) : Sum[T] = {
-    new Sum[T](dimension, nInputDims, sizeAverage)
+      sizeAverage: Boolean = false)(implicit ev: TensorNumeric[T]): Sum[T] = {
+    new Sum[T](Array(dimension), nInputDims, sizeAverage)
   }
+}
+
+object SumMulDim{
+  def apply[@specialized(Float, Double) T: ClassTag](
+      dimension: Array[Int] = Array(1),
+      nInputDims: Int = -1,
+      sizeAverage: Boolean = false,
+      resize: Boolean = true)(implicit ev: TensorNumeric[T]) : Sum[T] = {
+    new Sum[T](dimension, nInputDims, sizeAverage, resize)
+  }
+
 }

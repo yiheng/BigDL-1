@@ -455,7 +455,7 @@ object ConcatTF extends TFToBigDL{
     val nodeaxis = tfGraph.source.prevNodes(inputNumber)
     val axis = nodeaxis.element.getAttrMap.get("value").getTensor.getIntVal(0)
 
-    val dataFormatMatch = Map("N" -> 0, "H" -> 2, "w" -> 3, "C" -> 1)
+    val dataFormatMatch = Map("N" -> 0, "H" -> 2, "W" -> 3, "C" -> 1)
 
     val dimension = dataFormatMatch(TFToBigDL.dataFormat.charAt(axis).toString)
     val nInputDims = 4
@@ -511,6 +511,58 @@ object MulTF extends  TFToBigDL{
     require(scale.dim() == 1 && scale.size(1) == 1, s"scale must be one number")
     mul.weight.copy(scale)
     mul.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+
+object PaddingTF extends TFToBigDL{
+  private val graph = {
+    val nodePad = Node("Pad")
+    Node("*") -> nodePad
+    (Node("Const") -> nodePad).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : AbstractModule[Activity, Tensor[Float], Float] = {
+    val paddings = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(1).element.getAttrMap.get("value").getTensor)
+    val pad = ArrayBuffer[Int]()
+    val dims = ArrayBuffer[Int]()
+    val dataFormatMatch = Map("N" -> 0, "H" -> 2, "W" -> 3, "C" -> 1)
+
+    for(i <- 1 to paddings.size(1)) {
+      if (paddings(Array(i, 1)) != 0 || paddings(Array(i, 2)) != 0 ) {
+        dims += dataFormatMatch(TFToBigDL.dataFormat.charAt(i-1).toString) + 1
+        if (paddings(Array(i, 1)) != 0) pad += -paddings(Array(i, 1)).toInt else pad += 0
+        if (paddings(Array(i, 2)) != 0) pad += paddings(Array(i, 2)).toInt else pad += 0
+      }
+    }
+
+    PaddingMulDim[Float](dims.toArray, pad.toArray, 4)
+      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object MeanTF extends TFToBigDL{
+  private val graph = {
+    val nodeMean = Node("Mean")
+    Node("*") -> nodeMean
+    (Node("Const") -> nodeMean).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : AbstractModule[Activity, Tensor[Float], Float] = {
+    val dims = TFToBigDL.toTensor(
+      tfGraph.source.prevNodes(1).element.getAttrMap.get("value").getTensor)
+    val dim = ArrayBuffer[Int]()
+    val dataFormatMatch = Map("N" -> 0, "H" -> 2, "W" -> 3, "C" -> 1)
+    for (i <- 1 to dims.size(1)) dim += dataFormatMatch(TFToBigDL
+      .dataFormat.charAt(dims.valueAt(i).toInt).toString) + 1
+    MeanMulDim[Float](dim.toArray).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
@@ -601,7 +653,7 @@ object TFToBigDL {
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
       TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF, AddTF,
-      SoftMaxTF, MulTF
+      SoftMaxTF, MulTF, PaddingTF, MeanTF
     )
     res
   }

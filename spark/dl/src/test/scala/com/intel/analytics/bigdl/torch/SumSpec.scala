@@ -59,7 +59,7 @@ class SumSpec extends FlatSpec with BeforeAndAfter with Matchers {
   }
 
   "An Sum(2)" should "generate correct output and grad" in {
-    val layer = new Sum[Double](2)
+    val layer = Sum[Double](2)
     val input = Tensor[Double](2, 2, 2)
     input.apply1(x => randomn())
     val gradOutput = Tensor[Double](1, 2, 2)
@@ -87,7 +87,7 @@ class SumSpec extends FlatSpec with BeforeAndAfter with Matchers {
   }
 
   "An Sum(2,1,true)" should "generate correct output and grad" in {
-    val layer = new Sum[Double](2, 1, true)
+    val layer = Sum[Double](2, 1, true)
     val input = Tensor[Double](2, 2, 2)
     input.apply1(x => randomn())
     val gradOutput = Tensor[Double](1, 2, 2)
@@ -115,7 +115,7 @@ class SumSpec extends FlatSpec with BeforeAndAfter with Matchers {
   }
 
   "An Sum(-1,1,true)" should "generate correct output and grad" in {
-    val layer = new Sum[Double](-1, 1, true)
+    val layer = Sum[Double](-1, 1, true)
     val input = Tensor[Double](2, 2, 2)
     input.apply1(x => randomn())
     val gradOutput = Tensor[Double](1, 2, 2)

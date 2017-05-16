@@ -30,7 +30,8 @@ import scala.collection.mutable.ArrayBuffer
  * @param reverse use the original direction or the reversed direction
  * @tparam T Node element type
  */
-class DirectedGraph[T](val source : Node[T], val reverse : Boolean = false) {
+@SerialVersionUID(- 6252604964316218479L)
+class DirectedGraph[T](val source : Node[T], val reverse : Boolean = false) extends Serializable {
 
   /**
    * How many nodes in the graph
@@ -130,7 +131,8 @@ class DirectedGraph[T](val source : Node[T], val reverse : Boolean = false) {
  * @param element element
  * @tparam T element type
  */
-class Node[T](val element: T) {
+@SerialVersionUID(- 6021651923538325999L)
+class Node[T](val element: T) extends Serializable {
   /**
    * The nodes pointed by current node
    * @return

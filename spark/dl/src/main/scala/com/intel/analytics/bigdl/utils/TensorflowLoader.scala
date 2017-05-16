@@ -24,13 +24,13 @@ import java.util.{Collections, List}
 
 import com.intel.analytics.bigdl.Module
 import com.intel.analytics.bigdl.nn.Graph
-import com.intel.analytics.bigdl.nn.Graph.ModuleNode
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
 import com.intel.analytics.bigdl.tensor.Tensor
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
-case class TFSubGraph(input: Seq[Node[NodeDef]], output: Seq[Node[NodeDef]])
+case class TFInputOutputNodes(input: Seq[Node[NodeDef]], output: Seq[Node[NodeDef]])
 
 object TensorflowLoader{
   /**
@@ -55,7 +55,9 @@ object TensorflowLoader{
    */
   private[bigdl] def extract(graph: DirectedGraph[NodeDef],
                              context: Context)
-  : (Option[AbstractModule[Activity, Tensor[Float], Float]], List[Node[NodeDef]], TFSubGraph) = {
+  : (Option[AbstractModule[Activity, Tensor[Float], Float]],
+    List[Node[NodeDef]],
+    TFInputOutputNodes) = {
     var i = 0
     while(i < TFToBigDL.patterns.length) {
       val result = matchGraph(graph, TFToBigDL.patterns(i).topology)
@@ -63,8 +65,8 @@ object TensorflowLoader{
         // get model
         val input = TFToBigDL.patterns(i).getInputNodes(graph)
         val output = TFToBigDL.patterns(i).getOutputNodes(graph)
-        val subGraph = TFSubGraph(input, output)
-        return (Some(TFToBigDL.patterns(i).layer(graph, context)), result, subGraph)
+        val inputOutput = TFInputOutputNodes(input, output)
+        return (Some(TFToBigDL.patterns(i).layer(graph, context)), result, inputOutput)
       }
       i += 1
     }
@@ -144,7 +146,7 @@ object TensorflowLoader{
       } else if (convertedNode.get(n).isDefined) {
         // converted node, skip
       } else {
-        val (module, nodes, subGraph) = extract(n.graph(reverse = true), context)
+        val (module, nodes, inputOutput) = extract(n.graph(reverse = true), context)
         require(module.isDefined, s"Can not find matched graph ${n}")
         val node = new Node(module.get)
         nodes.asScala.foreach(m => {
@@ -152,13 +154,13 @@ object TensorflowLoader{
           nameToNode(m.element.getName) = node
         })
 
-        val outputNodes = if (subGraph.output == null) nodes.asScala else subGraph.output
+        val outputNodes = if (inputOutput.output == null) nodes.asScala else inputOutput.output
         val nextNodes = outputNodes.flatMap(_.nextNodes)
           .filter(n => n.element != null && convertedNode.contains(n)
             && !context.contains(n.element))
           .map(convertedNode(_)).filter(_ != node).toSet
         nextNodes.foreach(node -> _)
-        val inputNodes = if (subGraph.input == null) nodes.asScala else subGraph.input
+        val inputNodes = if (inputOutput.input == null) nodes.asScala else inputOutput.input
         val preNodes = inputNodes.flatMap(_.prevNodes)
           .filter(n => n.element != null && convertedNode.contains(n)
             && !context.contains(n.element))
@@ -172,7 +174,15 @@ object TensorflowLoader{
     val outputNodes = outputs
       .map(n => nameToNode.getOrElse(n, throw new IllegalArgumentException(s"Can't find node $n")))
 
-    Graph(inputNodes.toArray, outputNodes.toArray)
+
+    val weights = ArrayBuffer[Tensor[Float]]()
+    val gradients = ArrayBuffer[Tensor[Float]]()
+    for ((weight, grad) <- context.values) {
+      weights += weight
+      gradients += grad
+    }
+
+    Graph(inputNodes.toArray, outputNodes.toArray, Some((weights.toArray, gradients.toArray)))
   }
 
   /**

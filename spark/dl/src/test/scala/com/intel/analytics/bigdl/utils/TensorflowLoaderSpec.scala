@@ -17,12 +17,79 @@ package com.intel.analytics.bigdl.utils
 
 import java.io.{File => JFile}
 
+import com.intel.analytics.bigdl.dataset.{DistributedDataSet, MiniBatch}
 import com.intel.analytics.bigdl.nn._
-import com.intel.analytics.bigdl.tensor.Tensor
-import org.scalatest.{FlatSpec, Matchers}
+import com.intel.analytics.bigdl.optim.{DistriOptimizer, Trigger}
+import com.intel.analytics.bigdl.tensor.{Storage, Tensor}
+import org.apache.log4j.{Level, Logger}
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
+
+object TensorflowLoaderSpec {
+  private val data1 = Array(0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.1f)
+  private val data2 = Array(0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.1f)
+  private val input1: Tensor[Float] = Tensor[Float](Storage[Float](data1))
+  private val input2: Tensor[Float] = Tensor[Float](Storage[Float](data2))
+  private val nodeNumber = 4
+  private val coreNumber = 4
+  Engine.init
+
+  private val batchSize = 2 * coreNumber
+
+  private val prepareData: Int => (MiniBatch[Float]) = index => {
+    val input = Tensor[Float]().resize(batchSize, 10)
+    val target = Tensor[Float]().resize(batchSize, 10)
+    var i = 0
+    while (i < batchSize) {
+      if (i % 2 == 0) {
+        target.select(1, i + 1).copy(input1)
+        input.select(1, i + 1).copy(input1)
+      } else {
+        target.select(1, i + 1).copy(input2)
+        input.select(1, i + 1).copy(input2)
+      }
+      i += 1
+    }
+    MiniBatch(input, target)
+  }
+}
 
 @com.intel.analytics.bigdl.tags.Parallel
-class TensorflowLoaderSpec extends FlatSpec with Matchers {
+class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
+
+  Logger.getLogger("org").setLevel(Level.WARN)
+  Logger.getLogger("akka").setLevel(Level.WARN)
+
+  import TensorflowLoaderSpec._
+
+  var sc: SparkContext = null
+
+  var dataSet: DistributedDataSet[MiniBatch[Float]] = null
+
+  before {
+    sc = new SparkContext("local[1]", "RDDOptimizerSpec")
+
+    val rdd = sc.parallelize(1 to (256 * 4), 4).map(prepareData)
+
+    dataSet = new DistributedDataSet[MiniBatch[Float]] {
+      override def originRDD(): RDD[_] = rdd
+
+      override def data(train : Boolean): RDD[MiniBatch[Float]] = rdd
+
+      override def size(): Long = 256 * nodeNumber
+
+      override def shuffle(): Unit = {}
+    }
+
+    Engine.model.setPoolSize(1)
+  }
+
+  after {
+    if (sc != null) {
+      sc.stop()
+    }
+  }
 
   "TensorFlow loader" should "read a list of nodes from pb file" in {
     val resource = getClass().getClassLoader().getResource("tf")
@@ -95,6 +162,25 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers {
     val l2 = container.modules(3).asInstanceOf[Linear[Float]]
     assert(l1.weight eq l2.weight)
     assert(l1.bias eq l2.bias)
+  }
+
+  "Shared weights" should "be the same after running optimizer" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "share_weight.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"), Seq("output"))
+    val container = model.asInstanceOf[Graph[Float]]
+
+    val optimizer = new DistriOptimizer[Float](container, dataSet, new MSECriterion[Float]())
+      .setState(T("learningRate" -> 20.0))
+      .setEndWhen(Trigger.maxEpoch(5))
+    optimizer.optimize()
+
+    val l1 = container.modules(1).asInstanceOf[Linear[Float]]
+    val l2 = container.modules(3).asInstanceOf[Linear[Float]]
+    assert(l1.weight == l2.weight)
+    assert(l1.bias == l2.bias)
   }
 
   "TensorFlow loader" should "be able to load slim alexnetv2" in {

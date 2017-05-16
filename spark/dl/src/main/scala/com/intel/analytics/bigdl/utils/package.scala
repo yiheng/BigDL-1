@@ -22,6 +22,6 @@ import scala.collection.mutable
 
 package object utils {
 
-  type Context = mutable.HashMap[NodeDef, Tensor[Float]]
+  type Context = mutable.HashMap[NodeDef, (Tensor[Float], Tensor[Float])]
 
 }

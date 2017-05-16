@@ -49,11 +49,14 @@ import scala.reflect.ClassTag
  *
  * @param inputs input nodes
  * @param outputs output nodes
+ * @param context an Array of tensor containing all the weights and biases of this graph,
+ *                used when different nodes of this graph may share the same weight or bias.
  * @tparam T Numeric type. Only support float/double now
  */
 @SerialVersionUID(- 2896121321564992779L)
 class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
-  outputs : Seq[ModuleNode[T]])(implicit ev: TensorNumeric[T])
+  outputs : Seq[ModuleNode[T]],
+  context: Option[(Array[Tensor[T]], Array[Tensor[T]])] = None)(implicit ev: TensorNumeric[T])
   extends Container[Activity, Activity, T]{
 
   override def updateOutput(input: Activity): Activity = {
@@ -158,6 +161,13 @@ class Graph[T: ClassTag](inputs : Seq[ModuleNode[T]],
     }
   }
 
+  override def parameters(): (Array[Tensor[T]], Array[Tensor[T]]) = {
+    context match {
+      case None => super.parameters()
+      case Some((weights, gradients)) => (weights, gradients)
+    }
+  }
+
   override def add(module: AbstractModule[_ <: Activity, _ <: Activity, T]): Graph.this.type = {
     throw new IllegalArgumentException("Graph: Please don't use add method in Graph container. " +
       "A graph container should not be changed after it is constructed")
@@ -252,9 +262,11 @@ object Graph {
    * @param output output node
    * @return a graph container
    */
-  def apply[T: ClassTag](input : Array[ModuleNode[T]], output : Array[ModuleNode[T]])
+  def apply[T: ClassTag](input : Array[ModuleNode[T]],
+                         output : Array[ModuleNode[T]],
+                         context: Option[(Array[Tensor[T]], Array[Tensor[T]])] = None)
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
-    new Graph[T](input, output)
+    new Graph[T](input, output, context)
   }
 
   /**
@@ -263,7 +275,8 @@ object Graph {
    * @param output output nodes
    * @return a graph container
    */
-  def apply[T: ClassTag](input : ModuleNode[T], output : Array[ModuleNode[T]])
+  def apply[T: ClassTag](input : ModuleNode[T],
+                         output : Array[ModuleNode[T]])
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
     new Graph[T](Array(input), output)
   }
@@ -274,7 +287,8 @@ object Graph {
    * @param output output node
    * @return a graph container
    */
-  def apply[T: ClassTag](input : Array[ModuleNode[T]], output : ModuleNode[T])
+  def apply[T: ClassTag](input : Array[ModuleNode[T]],
+                         output : ModuleNode[T])
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
     new Graph[T](input, Array(output))
   }
@@ -285,7 +299,8 @@ object Graph {
    * @param output output nodes
    * @return a graph container
    */
-  def apply[T: ClassTag](input : ModuleNode[T], output : ModuleNode[T])
+  def apply[T: ClassTag](input : ModuleNode[T],
+                         output : ModuleNode[T])
     (implicit ev: TensorNumeric[T]) : Graph[T] = {
     new Graph[T](Array(input), Array(output))
   }

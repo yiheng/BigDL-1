@@ -50,13 +50,13 @@ class SpatialConvolution[T: ClassTag](
   require(nInputPlane % nGroup == 0, "Number of input channels should be multiples of group.")
   require(nOutputPlane % nGroup == 0, "Number of output channels should be multiples of group.")
 
-  val weight: Tensor[T] = Tensor[T](nGroup, nOutputPlane / nGroup,
+  var weight: Tensor[T] = Tensor[T](nGroup, nOutputPlane / nGroup,
     nInputPlane / nGroup, kernelH, kernelW)
-  val bias: Tensor[T] = Tensor[T](nOutputPlane)
+  var bias: Tensor[T] = Tensor[T](nOutputPlane)
 
-  val gradWeight: Tensor[T] = Tensor[T](nGroup, nOutputPlane / nGroup, nInputPlane / nGroup,
+  var gradWeight: Tensor[T] = Tensor[T](nGroup, nOutputPlane / nGroup, nInputPlane / nGroup,
     kernelH, kernelW)
-  val gradBias: Tensor[T] = Tensor[T](nOutputPlane)
+  var gradBias: Tensor[T] = Tensor[T](nOutputPlane)
 
   var fInput = Tensor[T]()
   var fGradInput = Tensor[T]()

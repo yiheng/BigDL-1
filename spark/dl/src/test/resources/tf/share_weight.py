@@ -35,6 +35,7 @@ def main():
     Wx_plus_b2 = tf.nn.bias_add(tf.matmul(output,W1), b1, name='output')
     saver = tf.train.Saver()
     with tf.Session() as sess:
+        file_writer = tf.summary.FileWriter(dir + '/model/logs', sess.graph)
         init = tf.global_variables_initializer()
         sess.run(init)
         checkpointpath = saver.save(sess, dir + '/model/share_weight.chkp')

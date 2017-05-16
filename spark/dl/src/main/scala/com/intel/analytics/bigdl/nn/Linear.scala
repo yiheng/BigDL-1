@@ -50,8 +50,8 @@ class Linear[T: ClassTag](
   var bias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
   val addBuffer: Tensor[T] = Tensor[T]()
 
-  val gradWeight: Tensor[T] = Tensor[T](outputSize, inputSize)
-  val gradBias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
+  var gradWeight: Tensor[T] = Tensor[T](outputSize, inputSize)
+  var gradBias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
   reset()
 
   def setInitMethod(initMethod: InitializationMethod): this.type = {

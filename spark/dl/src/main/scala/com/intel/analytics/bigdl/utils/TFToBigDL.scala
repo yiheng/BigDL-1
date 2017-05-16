@@ -22,10 +22,8 @@ import collection.JavaConverters._
 import com.intel.analytics.bigdl.nn._
 import com.intel.analytics.bigdl.tensor.{Storage, Tensor}
 import org.tensorflow.framework.{DataType, NodeDef, TensorProto}
-import TFToBigDL._
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity}
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 trait TFToBigDL {
@@ -35,20 +33,32 @@ trait TFToBigDL {
             context: Context)
   : (AbstractModule[Activity, Tensor[Float], Float])
 
+
+  /**
+   * @param tfGraph
+   * @return the nodes of this subgraph that accept input data
+   */
   def getInputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = null
 
+  /**
+   *
+   * @param tfGraph
+   * @return the nodes of this subgraph that emit output data
+   */
   def getOutputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = {
     Seq(tfGraph.source)
   }
 
   protected def getOrSetTensor(node: NodeDef, context: Context)
-                              (f: Tensor[Float] => Tensor[Float]): Tensor[Float] = {
+                              (f: Tensor[Float] => Tensor[Float])
+  : (Tensor[Float], Tensor[Float]) = {
     if (context.contains(node)) {
       context(node)
     } else {
-      val tensor = f(TFToBigDL.toTensor(node.getAttrMap.get("value").getTensor))
-      context.put(node, tensor)
-      tensor
+      val weight = f(TFToBigDL.toTensor(node.getAttrMap.get("value").getTensor)).contiguous()
+      val gradient = Tensor[Float](weight.size())
+      context.put(node, (weight, gradient))
+      (weight, gradient)
     }
   }
 }
@@ -69,14 +79,16 @@ object FullConnectionTF extends TFToBigDL{
 
     val biasNode = tfGraph.source.prevNodes(1).prevNodes.head.element
     val weightNode = tfGraph.source.prevNodes.head.prevNodes(1).prevNodes.head.element
-    val bias = getOrSetTensor(biasNode, context)(t => t)
-    val weight = getOrSetTensor(weightNode, context) { t =>
+    val (bias, gradBias) = getOrSetTensor(biasNode, context)(t => t)
+    val (weight, gradWeight) = getOrSetTensor(weightNode, context) { t =>
       t.transpose(1, 2)
     }
 
     val linearLayer = Linear[Float](weight.size(2), weight.size(1))
     linearLayer.weight = weight
     linearLayer.bias = bias
+    linearLayer.gradWeight = gradWeight
+    linearLayer.gradBias = gradBias
     linearLayer.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 
@@ -103,13 +115,17 @@ object Conv2D extends TFToBigDL{
     val add = Node("BiasAdd")
     val conv = Node("Conv2D")
 
-    Node("*") -> conv -> add
+    Node("*") -> conv
     Node("Const") -> Node("Identity") -> conv -> add
     Node("Const") -> Node("Identity") -> add
     add.graph(reverse = true)
   }
 
   override def topology: DirectedGraph[String] = graph
+
+  override def getInputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = {
+    Seq(tfGraph.source.prevNodes.head)
+  }
 
   override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
       : (AbstractModule[Activity, Tensor[Float], Float]) = {
@@ -128,16 +144,18 @@ object Conv2D extends TFToBigDL{
     } else {
       throw new IllegalArgumentException("no supported data format")
     }
-    val bias = TFToBigDL.toTensor(
-      tfGraph.source.prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor)
+    val biasNode = tfGraph.source.prevNodes(1).prevNodes.head.element
+    val (bias, gradBias) = getOrSetTensor(biasNode, context)(t => t)
 
-    val weights = TFToBigDL.toTensor(
-      tfGraph.source.prevNodes(0).prevNodes(1).prevNodes(0)
-        .element.getAttrMap.get("value").getTensor)
-    val nInputPlane = weights.size(3)
-    val nOuputPlane = weights.size(4)
-    val kernelH = weights.size(1)
-    val kernelW = weights.size(2)
+    val weightNode = tfGraph.source.prevNodes.head.prevNodes(1).prevNodes.head.element
+    val (weights, gradWeights) = getOrSetTensor(weightNode, context) { t =>
+      t.transpose(1, 4).transpose(2, 3).transpose(3, 4)
+    }
+
+    val nOuputPlane = weights.size(1)
+    val nInputPlane = weights.size(2)
+    val kernelH = weights.size(3)
+    val kernelW = weights.size(4)
 
     val (pW, pH) =
       if (attributes.get("padding").getS.toString(Charset.defaultCharset()) == "SAME") {
@@ -150,8 +168,10 @@ object Conv2D extends TFToBigDL{
 
     val convLayer = SpatialConvolution[Float](
       nInputPlane, nOuputPlane, kernelW, kernelH, strideW, strideH, pW, pH)
-    convLayer.bias.copy(bias)
-    convLayer.weight.copy(weights.transpose(1, 4).transpose(2, 3))
+    convLayer.bias = bias
+    convLayer.weight = weights
+    convLayer.gradWeight = gradWeights
+    convLayer.gradBias = gradBias
     convLayer.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
@@ -394,6 +414,10 @@ object BatchNormTF extends TFToBigDL{
     nodeAdd2.graph(reverse = true)
   }
 
+  override def getInputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = {
+    Seq(tfGraph.source.prevNodes.head.prevNodes.head)
+  }
+
   override def topology: DirectedGraph[String] = graph
 
   override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
@@ -401,16 +425,17 @@ object BatchNormTF extends TFToBigDL{
     val nOutput = tfGraph.source.prevNodes(1).prevNodes(1).prevNodes(1)
         .prevNodes(1).prevNodes(0).element.getAttrMap.get("value").getTensor.getIntVal(0)
 
-    val bias = TFToBigDL.toTensor(
-      tfGraph.source.prevNodes(1).prevNodes(0).prevNodes(0)
-          .element.getAttrMap.get("value").getTensor)
-    val weights = TFToBigDL.toTensor(
-      tfGraph.source.prevNodes(1).prevNodes(1).prevNodes(1).prevNodes(0).prevNodes(0)
-        .element.getAttrMap.get("value").getTensor)
+    val weightNode = tfGraph.source.prevNodes(1).prevNodes.head.prevNodes.head.element
+    val biasNode = tfGraph.source.prevNodes(1).prevNodes(1).prevNodes(1)
+      .prevNodes.head.prevNodes.head.element
+    val (weights, gradWeights) = getOrSetTensor(weightNode, context)(t => t)
+    val (bias, gradBias) = getOrSetTensor(weightNode, context)(t => t)
 
     val spatialBatchNorm = SpatialBatchNormalization[Float](nOutput = nOutput)
-    spatialBatchNorm.weight.copy(weights)
-    spatialBatchNorm.bias.copy(bias)
+    spatialBatchNorm.weight = weights
+    spatialBatchNorm.bias = bias
+    spatialBatchNorm.gradWeight = gradWeights
+    spatialBatchNorm.gradBias = bias
     spatialBatchNorm.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }

@@ -62,11 +62,11 @@ class BatchNormalization[@specialized(Float, Double) T: ClassTag](
   val saveMean = Tensor[T](nOutput)
   val saveStd = Tensor[T](nOutput).fill(ev.fromType[Int](1))
 
-  val weight: Tensor[T] = if (affine) Tensor[T](nOutput) else null
-  val bias: Tensor[T] = if (affine) Tensor[T](nOutput) else null
+  var weight: Tensor[T] = if (affine) Tensor[T](nOutput) else null
+  var bias: Tensor[T] = if (affine) Tensor[T](nOutput) else null
 
-  val gradWeight: Tensor[T] = if (affine) Tensor[T](nOutput) else null
-  val gradBias: Tensor[T] = if (affine) Tensor[T](nOutput) else null
+  var gradWeight: Tensor[T] = if (affine) Tensor[T](nOutput) else null
+  var gradBias: Tensor[T] = if (affine) Tensor[T](nOutput) else null
 
   @transient
   private var results : Array[Future[_]] = null

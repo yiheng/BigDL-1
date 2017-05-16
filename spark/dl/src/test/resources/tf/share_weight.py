@@ -32,7 +32,10 @@ def main():
     Wx_plus_b1 = tf.nn.bias_add(tf.matmul(xs,W1), b1)
     output= tf.nn.tanh(Wx_plus_b1)
 
-    Wx_plus_b2 = tf.nn.bias_add(tf.matmul(output,W1), b1, name='output')
+    Wx_plus_b2 = tf.nn.bias_add(tf.matmul(output,W1), b1)
+    W2 = tf.Variable(tf.random_normal([10, 1]))
+    b2 = tf.Variable(tf.random_normal([1]))
+    final = tf.nn.bias_add(tf.matmul(Wx_plus_b2, W2), b2, name='output')
     saver = tf.train.Saver()
     with tf.Session() as sess:
         file_writer = tf.summary.FileWriter(dir + '/model/logs', sess.graph)

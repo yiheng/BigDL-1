@@ -93,7 +93,7 @@ object FullConnectionTF extends TFToBigDL{
   }
 
   override def getInputNodes(tfGraph: DirectedGraph[NodeDef]): Seq[Node[NodeDef]] = {
-    Seq(tfGraph.source.prevNodes.head.prevNodes.head)
+    Seq(tfGraph.source.prevNodes.head)
   }
 }
 
@@ -364,6 +364,34 @@ object Placeholder extends TFToBigDL {
   }
 }
 
+object ConstTF extends TFToBigDL {
+  private val graph = Node("Const").graph(reverse = true)
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : AbstractModule[Activity, Tensor[Float], Float] = {
+    val value = TFToBigDL.toTensor(tfGraph.source.element.getAttrMap.get("value").getTensor)
+    Const(value).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object ShapeTF extends TFToBigDL {
+  private val graph = {
+    val node = Node("Shape")
+    Node("*") -> node
+    node.graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : AbstractModule[Activity, Tensor[Float], Float] = {
+
+    new Shape[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
 object IdentityTF extends TFToBigDL {
   private val graph = (Node("*") -> Node("Identity")).graph(reverse = true)
 
@@ -440,6 +468,97 @@ object BatchNormTF extends TFToBigDL{
   }
 }
 
+object FillTF extends TFToBigDL{
+  private val graph = {
+    val nodeFill = Node("Fill")
+    Node("*") -> nodeFill
+    Node("Const") -> nodeFill
+    nodeFill.graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val constNode = tfGraph.source.prevNodes(1)
+    val const = constNode.element.getAttrMap.get("value").getTensor.getFloatVal(0)
+
+    Fill[Float](const).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object PackTF extends TFToBigDL{
+  private val graph = {
+    val nodePack = Node("Pack")
+    Node("...") -> nodePack
+    nodePack.graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val dim = tfGraph.source.element.getAttrMap.get("axis").getI.toInt + 1
+
+    Pack[Float](dim).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object UnpackTF extends TFToBigDL{
+  private val graph = {
+    val nodePack = Node("Unpack")
+    Node("*") -> nodePack
+    nodePack.graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val dim = tfGraph.source.element.getAttrMap.get("axis").getI.toInt + 1
+    val index = tfGraph.source.element.getName.split(":").toList match {
+      case _::Nil => 1
+      case _::i::Nil => i.toInt + 1
+    }
+    Select[Float](dim, index).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object StrideSliceTF extends TFToBigDL {
+  private val graph = {
+    val nodeSlice = Node("StridedSlice")
+    Node("*") -> nodeSlice
+    Node("Const") -> nodeSlice
+    Node("Const") -> nodeSlice
+    Node("Const") -> nodeSlice
+    nodeSlice.graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : AbstractModule[Activity, Tensor[Float], Float] = {
+    val startNode = tfGraph.source.prevNodes(1)
+    val endNode = tfGraph.source.prevNodes(2)
+    val strideNode = tfGraph.source.prevNodes(3)
+
+    def getIntArray(node: Node[NodeDef]) = {
+      node.element.getAttrMap.get("value").getTensor.getIntValList.asScala.map(_.toInt)
+    }
+
+    val start = getIntArray(startNode)
+    val end = getIntArray(endNode)
+    val stride = getIntArray(strideNode)
+
+    val specs = (start zip end zip stride).zipWithIndex
+      .map(elem => (elem._2 + 1, elem._1._1._1 + 1, elem._1._1._2 + 1, elem._1._2)).toArray
+
+
+    StrideSlice[Float](specs).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+
 object ConcatTF extends TFToBigDL{
   private val graph = {
     val nodeConcat = Node("ConcatV2")
@@ -454,13 +573,9 @@ object ConcatTF extends TFToBigDL{
     val inputNumber = tfGraph.source.element.getAttrMap.get("N").getI.toInt
     val nodeaxis = tfGraph.source.prevNodes(inputNumber)
     val axis = nodeaxis.element.getAttrMap.get("value").getTensor.getIntVal(0)
-
-    val dataFormatMatch = Map("N" -> 0, "H" -> 2, "W" -> 3, "C" -> 1)
-
-    val dimension = dataFormatMatch(TFToBigDL.dataFormat.charAt(axis).toString)
     val nInputDims = 4
 
-    new JoinTable[Float](dimension = dimension + 1, nInputDims = nInputDims)
+    new JoinTable[Float](dimension = axis + 1, nInputDims = -1)
       .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
@@ -620,7 +735,7 @@ object TFToBigDL {
       if (tfTensor.getDtype == DataType.DT_FLOAT) {
         return Tensor[Float](T(tfTensor.getFloatVal(0)))
       } else {
-        return Tensor[Float](T(tfTensor.getIntVal(0)))
+        return Tensor[Float](T(tfTensor.getIntVal(0).toFloat))
       }
     }
 
@@ -653,7 +768,7 @@ object TFToBigDL {
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
       TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF, AddTF,
-      SoftMaxTF, MulTF, PaddingTF, MeanTF
+      SoftMaxTF, MulTF, PaddingTF, MeanTF, UnpackTF, StrideSliceTF, ShapeTF, FillTF, PackTF, ConstTF
     )
     res
   }

@@ -140,7 +140,7 @@ object TensorflowLoader{
 
     val context = new Context
 
-    tfGraph.DFS.foreach(n => {
+    tfGraph.BFS.foreach(n => {
       if (n.element == null) {
         // Dummy node, skip
       } else if (convertedNode.get(n).isDefined) {
@@ -160,6 +160,7 @@ object TensorflowLoader{
             && !context.contains(n.element))
           .map(convertedNode(_)).filter(_ != node).toSet
         nextNodes.foreach(node -> _)
+
         val inputNodes = if (inputOutput.input == null) nodes.asScala else inputOutput.input
         val preNodes = inputNodes.flatMap(_.prevNodes)
           .filter(n => n.element != null && convertedNode.contains(n)
@@ -192,7 +193,16 @@ object TensorflowLoader{
    */
   private[bigdl] def buildTFGraph(nodes : List[NodeDef]): DirectedGraph[NodeDef] = {
     import scala.collection.JavaConverters._
-    val name2Node = nodes.asScala.map(n => n.getName -> new Node(n)).toMap
+    var name2Node = nodes.asScala.map(n => n.getName -> new Node(n)).toMap
+    nodes.asScala
+      .flatMap(_.getInputList.asScala)
+      .filter(_.split(":").length > 1)
+      .foreach { nameWithChannel =>
+        val name = nameWithChannel.split(":").head
+        val tfNode = NodeDef.newBuilder(name2Node(name).element)
+          .setName(nameWithChannel).build()
+        name2Node += nameWithChannel -> new Node(tfNode)
+      }
     // Connect nodes
     name2Node.valuesIterator.foreach(n => {
       n.element.getInputList.asScala.foreach(name2Node(_) -> n)

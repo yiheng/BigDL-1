@@ -184,6 +184,37 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     assert(l1.bias == l2.bias)
   }
 
+  "TensorFlow loader" should "be able to load rnn_cell with zero state" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "rnn_cell.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("output"))
+    val input = Tensor[Float](4, 10).rand()
+    val gradient = Tensor[Float](4, 5).rand()
+    val result: Tensor[Float] = model.forward(input).asInstanceOf[Tensor[Float]]
+    val expectedResult = Tensor[Float](4, 5).fill(2.0f)
+    val expectedGrad = Tensor[Float](4, 10)
+    result should be(expectedResult)
+    val grad = model.backward(input, gradient)
+    grad should be(expectedGrad)
+  }
+
+  "TensorFlow loader" should "be able to load static rnn model" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "rnn.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("output"))
+
+    val input = Tensor[Float](4, 5, 10).rand()
+    val gradient = Tensor[Float](4, 5).rand()
+    model.forward(input)
+    model.backward(input, gradient)
+  }
+
   "TensorFlow loader" should "be able to load slim alexnetv2" in {
     val resource = getClass().getClassLoader().getResource("tf")
     val path = processPath(resource.getPath()) + JFile.separator + "alexnet.pb"

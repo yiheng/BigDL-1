@@ -21,6 +21,12 @@ import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 
 import scala.reflect.ClassTag
 
+/**
+ * Creates a tensor filled with a scalar value. Input should be a 1-D tensor defining
+ * the shape of the output tensor.
+ * @param value the scalar value to be filled.
+ */
+@SerialVersionUID(-471757174144422555L)
 class Fill[@specialized(Float, Double) T: ClassTag](value: T) (implicit ev: TensorNumeric[T])
   extends TensorModule[T] {
 

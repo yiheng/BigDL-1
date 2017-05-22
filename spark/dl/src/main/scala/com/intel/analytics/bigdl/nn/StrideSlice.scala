@@ -22,8 +22,10 @@ import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 import scala.reflect.ClassTag
 
 /**
- * Given input, return the shape of this input as a 1-D tensor
+ * Extracts a strided slice from a tensor.
+ * @param sliceSpecs Array(dim, begin_index, end_index, stride)
  */
+@SerialVersionUID(4436600172725317184L)
 class StrideSlice[T: ClassTag](sliceSpecs: Array[(Int, Int, Int, Int)])
                 (implicit ev: TensorNumeric[T]) extends TensorModule[T] {
 

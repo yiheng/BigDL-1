@@ -24,6 +24,7 @@ import scala.reflect.ClassTag
 /**
  * Given input, return the shape of this input as a 1-D tensor
  */
+@SerialVersionUID(-907995771209831179L)
 class Shape[T: ClassTag](implicit ev: TensorNumeric[T])
   extends AbstractModule[Tensor[T], Tensor[T], T] {
 

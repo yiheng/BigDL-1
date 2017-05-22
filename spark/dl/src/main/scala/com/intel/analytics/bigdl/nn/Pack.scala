@@ -22,6 +22,12 @@ import com.intel.analytics.bigdl.utils.Table
 
 import scala.reflect.ClassTag
 
+/**
+ * Stacks a list of n-dimensional tensors into one (n+1)-dimensional tensor.
+ * @param dimension the dimension to stack along
+ * @tparam T Numeric type. Only support float/double now
+ */
+@SerialVersionUID(3457313421501931556L)
 class Pack[T: ClassTag] (val dimension: Int)(implicit ev: TensorNumeric[T])
   extends AbstractModule[Table, Tensor[T], T] {
 

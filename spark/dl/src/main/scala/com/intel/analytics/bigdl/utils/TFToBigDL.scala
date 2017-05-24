@@ -202,6 +202,19 @@ object TanhTF extends  TFToBigDL{
   }
 }
 
+object SigmoidTF extends  TFToBigDL{
+  private val graph = {
+    (Node("*") -> Node("Sigmoid")).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    Sigmoid[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
 object ReshapeTF extends TFToBigDL {
   private val graph = {
     val nodeReshape = Node("Reshape")
@@ -629,6 +642,47 @@ object MulTF extends  TFToBigDL{
   }
 }
 
+object ElementWiseMulTF extends  TFToBigDL{
+  private val graph = {
+    val nodeMul = Node("Mul")
+    Node("*") -> nodeMul
+    (Node("*") -> nodeMul).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val mul = CMulTable[Float]()
+    mul.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object SplitTF extends  TFToBigDL {
+
+  private val graph = {
+    val nodeSplit = Node("Split")
+    Node("Const") -> nodeSplit
+    (Node("*") -> nodeSplit).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val numSplit = tfGraph.source.element.getAttrMap.get("num_split").getI.toInt
+    val dim = tfGraph.source.prevNodes.head.element
+      .getAttrMap.get("value").getTensor.getIntVal(0) + 1
+    val index = tfGraph.source.element.getName.split(":").toList match {
+      case _::Nil => 1
+      case _::i::Nil => i.toInt + 1
+    }
+    SplitAndSelect[Float](dim, index, numSplit)
+      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+
+}
+
 
 object PaddingTF extends TFToBigDL{
   private val graph = {
@@ -765,10 +819,12 @@ object TFToBigDL {
 
   private var patternList : ArrayBuffer[TFToBigDL] = {
     val res = new ArrayBuffer[TFToBigDL]()
+    // ElementWiseMulTF must be after MulTF
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
-      TanhTF, ReluTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF, AddTF,
-      SoftMaxTF, MulTF, PaddingTF, MeanTF, UnpackTF, StrideSliceTF, ShapeTF, FillTF, PackTF, ConstTF
+      TanhTF, ReluTF, SigmoidTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF,
+      AddTF, SoftMaxTF, MulTF, ElementWiseMulTF, SplitTF, PaddingTF, MeanTF, UnpackTF, StrideSliceTF,
+      ShapeTF, FillTF, PackTF, ConstTF
     )
     res
   }

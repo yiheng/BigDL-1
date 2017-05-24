@@ -826,13 +826,12 @@ private[tensor] class DenseTensor[@specialized(Float, Double) T: ClassTag](
   override def add(value: T, y: Tensor[T]): Tensor[T] = DenseTensorMath.cadd(this, this, value, y)
 
   override def add(x: Tensor[T]): Tensor[T] = {
-    require(this.nElement() == x.nElement())
+    require(canBroadcast(x), s"tensor of size ${x.size().mkString("x")} cannot be" +
+      s"added to tensor of size ${this.size().mkString("x")}")
     if (MKL.isMKLLoaded && this.isContiguous() && x.isContiguous()) {
-      ev.vAdd(this.nElement(), this.storage().array(), this.storageOffset() - 1,
-        x.storage().array(), x.storageOffset() - 1,
-        this.storage().array(), this.storageOffset() - 1)
-    }
-    else {
+      broadcastAdd(x)
+    } else {
+      require(this.nElement() == x.nElement(), "broadcast add only support for contiguous tensors")
       val func = new TensorFunc4[T] {
         override def apply (data1: Array[T], offset1: Int, data2: Array[T], offset2: Int): Unit = {
           data1(offset1) = ev.plus(data1(offset1), data2(offset2))
@@ -841,6 +840,48 @@ private[tensor] class DenseTensor[@specialized(Float, Double) T: ClassTag](
       DenseTensorApply.apply2[T](this, x, func)
     }
     this
+  }
+
+  private def broadcastAdd(x: Tensor[T]): Tensor[T] = {
+    val nElementThis = this.nElement()
+    val nElementThat = x.nElement()
+    val n = nElementThis / nElementThat
+    var i = 0
+    var offset = this.storageOffset() - 1
+    if (nElementThat == 1) {
+      val value = x.valueAt(1)
+      ev.add(this.nElement(), this.storage().array(), this.storageOffset() - 1, value, 1)
+    } else {
+      while (i < n) {
+        ev.vAdd(x.nElement(), this.storage().array(), offset,
+          x.storage().array(), x.storageOffset() - 1,
+          this.storage().array(), offset)
+        i = i + 1
+        offset = offset + nElementThat
+      }
+    }
+    this
+  }
+
+  private def canBroadcast(x: Tensor[T]): Boolean = {
+    if (this.nDimension < x.nDimension()) {
+      return false
+    }
+
+    if (x.nElement() == 1) {
+      return true
+    }
+
+    var i = x.nDimension()
+    var j = this.nDimension
+    while(i >= 1) {
+      if (x.size(i) != this.size(j)) {
+        return false
+      }
+      i = i - 1
+      j = j - 1
+    }
+    true
   }
 
   override def add(x: Tensor[T], y: Tensor[T]): Tensor[T] = {

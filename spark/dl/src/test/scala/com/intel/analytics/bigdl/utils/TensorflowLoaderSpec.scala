@@ -201,9 +201,23 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     grad should be(expectedGrad)
   }
 
-  "TensorFlow loader" should "be able to load static rnn model" in {
+  "TensorFlow loader" should "be able to load static simple rnn model" in {
     val resource = getClass().getClassLoader().getResource("tf")
     val path = processPath(resource.getPath()) + JFile.separator + "rnn.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results)
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),
+      Seq("output"))
+
+    val input = Tensor[Float](4, 5, 10).rand()
+    val gradient = Tensor[Float](4, 5).rand()
+    model.forward(input)
+    model.backward(input, gradient)
+  }
+
+  "TensorFlow loader" should "be able to load static lstm rnn model" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "lstm.pb"
     val results = TensorflowLoader.parse(path)
     val tfGraph = TensorflowLoader.buildTFGraph(results)
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("Placeholder"),

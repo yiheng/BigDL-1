@@ -25,6 +25,7 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
+import scala.math._
 
 object TensorflowLoaderSpec {
   private val data1 = Array(0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.1f)
@@ -345,6 +346,117 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     val gradient2 = Tensor[Float](5, 1001).rand()
     model.forward(input)
     model.backward(input, T(gradient1, gradient2))
+  }
+
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim alexnet" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "alexnet_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-1))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("alexnet_v2/fc8/squeezed"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient = Tensor[Float](1, 1000).rand()
+    val tfResult = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult.map( BigDLResult.toTensor, (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    model.backward(input, gradient)
+  }
+
+
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim vgga" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "vgga_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-1))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("vgg_a/fc8/squeezed"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient = Tensor[Float](1, 1000).rand()
+    val tfResult = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult.map( BigDLResult.toTensor, (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    model.backward(input, gradient)
+  }
+
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim vgg_16" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "vgg16_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-1))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("vgg_16/fc8/squeezed"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient = Tensor[Float](1, 1000).rand()
+    val tfResult = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult.map( BigDLResult.toTensor, (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    model.backward(input, gradient)
+  }
+
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim vgg_19" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "vgg19_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-1))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("vgg_19/fc8/squeezed"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient = Tensor[Float](1, 1000).rand()
+    val tfResult = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult.map( BigDLResult.toTensor, (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    model.backward(input, gradient)
+  }
+
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim overfeat" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "overfeat_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-1))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("overfeat/fc8/squeezed"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient = Tensor[Float](1, 1000).rand()
+    val tfResult = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult.map( BigDLResult.toTensor, (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    model.backward(input, gradient)
   }
 
   private def processPath(path: String): String = {

@@ -28,19 +28,23 @@ def main():
     1. mkdir model
     2. python overfeat.py
     3. wget https://raw.githubusercontent.com/tensorflow/tensorflow/v1.0.0/tensorflow/python/tools/freeze_graph.py
-    4. python freeze_graph.py --input_graph model/overfeat.pbtxt --input_checkpoint model/overfeat.chkp --output_node_names="overfeat/fc8/squeezed" --output_graph overfeat.pb
+    4. python freeze_graph.py --input_graph model/overfeat.pbtxt --input_checkpoint model/overfeat.chkp --output_node_names="overfeat/fc8/squeezed,output" --output_graph overfeat_save.pb
     """
     dir = os.path.dirname(os.path.realpath(__file__))
     batch_size = 5
     height, width = 231, 231
     num_classes = 1000
-    inputs = tf.placeholder(tf.float32, [None, height, width, 3])
+    #inputs = tf.placeholder(tf.float32, [None, height, width, 3])
+    inputs = tf.Variable(tf.random_uniform((1, height, width, 3)), name='input')
     with slim.arg_scope(overfeat.overfeat_arg_scope()):
-        net, end_points = overfeat.overfeat(inputs)
+        net, end_points = overfeat.overfeat(inputs, is_training = False)
+    output = tf.Variable(tf.random_uniform(tf.shape(net)),name='output')
+    result = tf.assign(output,net)
     saver = tf.train.Saver()
     with tf.Session() as sess:
         init = tf.global_variables_initializer()
         sess.run(init)
+        sess.run(result)        
         checkpointpath = saver.save(sess, dir + '/model/overfeat.chkp')
         tf.train.write_graph(sess.graph, dir + '/model', 'overfeat.pbtxt')
         tf.summary.FileWriter(dir + '/log', sess.graph)

@@ -97,14 +97,16 @@ object FullConnectionTF extends TFToBigDL{
   }
 }
 
-object SqueezeTF extends TFToBigDL {
+object  SqueezeTF extends TFToBigDL {
   private val graph = (Node("*") -> Node("Squeeze")).graph(reverse = true)
   override def topology: DirectedGraph[String] = graph
 
   override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
     : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val dataFormatMatch = Map("N" -> 0, "H" -> 2, "W" -> 3, "C" -> 1)
     val dims = tfGraph.source.element.getAttrOrThrow("squeeze_dims").getList().getIList()
       .asScala.map(_.toInt).toArray
+      .map(i => dataFormatMatch(TFToBigDL.dataFormat.charAt(i).toString))
     Squeeze[Float](dims, batchMode = true)
       .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -377,13 +379,13 @@ object Placeholder extends TFToBigDL {
   }
 }
 
+
 object ConstTF extends TFToBigDL {
   private val graph = Node("Const").graph(reverse = true)
-
   override def topology: DirectedGraph[String] = graph
 
   override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
-  : AbstractModule[Activity, Tensor[Float], Float] = {
+   : AbstractModule[Activity, Tensor[Float], Float] = {
     val value = TFToBigDL.toTensor(tfGraph.source.element.getAttrMap.get("value").getTensor)
     Const(value).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
@@ -402,6 +404,17 @@ object ShapeTF extends TFToBigDL {
   : AbstractModule[Activity, Tensor[Float], Float] = {
 
     new Shape[Float]().asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object InputTF extends TFToBigDL {
+  private val graph = (Node("Const") -> Node("Identity")).graph(reverse = true)
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+    : AbstractModule[Activity, Tensor[Float], Float] = {
+    new Input[Float].asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
@@ -821,7 +834,7 @@ object TFToBigDL {
     val res = new ArrayBuffer[TFToBigDL]()
     // ElementWiseMulTF must be after MulTF
     res.append(
-      FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF,
+      FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF, InputTF,
       TanhTF, ReluTF, SigmoidTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF,
       AddTF, SoftMaxTF, MulTF, ElementWiseMulTF, SplitTF, PaddingTF, MeanTF, UnpackTF, StrideSliceTF,
       ShapeTF, FillTF, PackTF, ConstTF

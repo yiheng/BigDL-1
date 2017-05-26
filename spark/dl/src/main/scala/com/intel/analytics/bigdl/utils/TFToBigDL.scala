@@ -606,6 +606,40 @@ object ConcatTF extends TFToBigDL{
   }
 }
 
+object AddConstTF1 extends  TFToBigDL{
+  private val graph = {
+    val nodeAdd = Node("Add")
+    Node("Const") -> nodeAdd
+    (Node("*") -> nodeAdd).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val value = tfGraph.source.prevNodes.head.element
+      .getAttrMap.get("value").getTensor.getFloatVal(0)
+    AddConstant[Float](value).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
+object AddConstTF2 extends  TFToBigDL{
+  private val graph = {
+    val nodeAdd = Node("Add")
+    Node("*") -> nodeAdd
+    (Node("Const") -> nodeAdd).graph(reverse = true)
+  }
+
+  override def topology: DirectedGraph[String] = graph
+
+  override def layer(tfGraph: DirectedGraph[NodeDef], context: Context)
+  : (AbstractModule[Activity, Tensor[Float], Float]) = {
+    val value = tfGraph.source.prevNodes(1).element
+      .getAttrMap.get("value").getTensor.getFloatVal(0)
+    AddConstant[Float](value).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+  }
+}
+
 object AddTF extends  TFToBigDL{
   private val graph = {
     val nodeAdd = Node("Add")
@@ -835,9 +869,9 @@ object TFToBigDL {
     // ElementWiseMulTF must be after MulTF
     res.append(
       FullConnectionTF, DropoutTF, AvgPoolingTF, MaxPoolingTF, ReshapeTF, InputTF,
-      TanhTF, ReluTF, SigmoidTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF, BatchNormTF,
-      AddTF, SoftMaxTF, MulTF, ElementWiseMulTF, SplitTF, PaddingTF, MeanTF, UnpackTF, StrideSliceTF,
-      ShapeTF, FillTF, PackTF, ConstTF
+      TanhTF, ReluTF, SigmoidTF, Conv2D, Placeholder, SqueezeTF, IdentityTF, ConcatTF,
+      BatchNormTF, AddConstTF1, AddConstTF2, AddTF, SoftMaxTF, MulTF, ElementWiseMulTF,
+      SplitTF, PaddingTF, MeanTF, UnpackTF, StrideSliceTF, ShapeTF, FillTF, PackTF, ConstTF
     )
     res
   }

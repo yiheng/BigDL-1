@@ -523,7 +523,7 @@ object DenseTensorMath {
 
   def addr[@specialized(Float, Double) T](r: Tensor[T], beta: T, t: Tensor[T],
     alpha: T, vec1: Tensor[T], vec2: Tensor[T])(implicit ev: TensorNumeric[T]): Tensor[T] = {
-    require(vec1.dim() == 1 && vec2.dim() == 1, s"Invalid dimension ${vec1.dim()} ${vec2.dim()}")
+    require(vec1.dim() == 1 && vec2.dim() == 1)
     require(t.dim() == 2)
     require(t.size(1) == vec1.size(1) && t.size(2) == vec2.size(1))
 
@@ -607,17 +607,7 @@ object DenseTensorMath {
       r.resizeAs(t).copy(t)
     }
 
-    /**
-     * Remember BLAS is a column major matrix and bigdl tensor is row major layout. So transpose
-     * of BigDL tensor and BLAS is opposited.
-     *
-     * We first check stride(2).
-     */
-    if (mat.stride(2) == 1) {
-      ev.gemv('T', mat.size(2), mat.size(1), alpha, mat.storage().array(), mat.storageOffset() - 1,
-        mat.stride(1), vec.storage().array(), vec.storageOffset() - 1, vec.stride(1), beta,
-        r.storage().array(), r.storageOffset() - 1, r.stride(1))
-    } else if (mat.stride(1) == 1) {
+    if (mat.stride(1) == 1) {
       val lda = if (mat.size(2) == 1) {
         mat.size(1)
       } else {
@@ -627,6 +617,10 @@ object DenseTensorMath {
         lda, vec.storage().array(), vec.storageOffset() - 1, vec.stride(1), beta,
         r.storage().array(),
         r.storageOffset() - 1, r.stride(1))
+    } else if (mat.stride(2) == 1) {
+      ev.gemv('T', mat.size(2), mat.size(1), alpha, mat.storage().array(), mat.storageOffset() - 1,
+        mat.stride(1), vec.storage().array(), vec.storageOffset() - 1, vec.stride(1), beta,
+        r.storage().array(), r.storageOffset() - 1, r.stride(1))
     } else {
       val cmat = mat.contiguous()
       ev.gemv('T', cmat.size(2), cmat.size(1), alpha, cmat.storage().array(),

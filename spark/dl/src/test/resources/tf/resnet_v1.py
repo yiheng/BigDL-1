@@ -27,18 +27,22 @@ def main():
     1. mkdir model
     2. python resnet_v1.py
     3. wget https://raw.githubusercontent.com/tensorflow/tensorflow/v1.0.0/tensorflow/python/tools/freeze_graph.py
-    4. python freeze_graph.py --input_graph model/resnet_v1.pbtxt --input_checkpoint model/resnet_v1.chkp --output_node_names="resnet_v1_101/SpatialSqueeze" --output_graph resnet_v1.pb
+    4. python freeze_graph.py --input_graph model/resnet_v1.pbtxt --input_checkpoint model/resnet_v1.chkp --output_node_names="resnet_v1_101/SpatialSqueeze,output" --output_graph resnet_v1_save.pb
     """
     dir = os.path.dirname(os.path.realpath(__file__))
     batch_size = 5
     height, width = 224, 224
     num_classes = 1000
-    inputs = tf.placeholder(tf.float32, [None, height, width, 3])
+    #inputs = tf.placeholder(tf.float32, [None, height, width, 3])
+    inputs = tf.Variable(tf.random_uniform((2, height, width, 3)), name='input')
     net, end_points = resnet_v1.resnet_v1_101(inputs, 1000, is_training=True)
+    output = tf.Variable(tf.random_uniform(tf.shape(net)),name='output')
+    result = tf.assign(output,net)
     saver = tf.train.Saver()
     with tf.Session() as sess:
         init = tf.global_variables_initializer()
         sess.run(init)
+        sess.run(result)
         checkpointpath = saver.save(sess, dir + '/model/resnet_v1.chkp')
         tf.train.write_graph(sess.graph, dir + '/model', 'resnet_v1.pbtxt')
         tf.summary.FileWriter(dir + '/log', sess.graph)

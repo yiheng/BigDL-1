@@ -332,7 +332,7 @@ object AvgPoolingTF extends TFToBigDL{
         (0, 0)
       }
 
-    SpatialAveragePooling[Float](ksizeW, ksizeH, strideW, strideH, pW, pH)
+    SpatialAveragePooling[Float](ksizeW, ksizeH, strideW, strideH, pW, pH, countIncludePad = false)
       .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }

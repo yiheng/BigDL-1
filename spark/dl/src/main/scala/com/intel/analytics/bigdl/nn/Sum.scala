@@ -85,7 +85,7 @@ class Sum[T: ClassTag](
           output.resize(outputSize.array())
         }
       }
-      tempinput = output
+      tempinput = output.clone()
     })
     output
   }

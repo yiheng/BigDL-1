@@ -460,6 +460,50 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     model.backward(input, gradient)
   }
 
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim inception_v3" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "inception_v3_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-1))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("InceptionV3/Logits/SpatialSqueeze"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient = Tensor[Float](1, 1000).rand()
+    val tfResult = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult.map( BigDLResult.toTensor, (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    model.backward(input, gradient)
+  }
+
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim resnet_v1" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "resnet_v1_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-1))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("resnet_v1_101/SpatialSqueeze"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient = Tensor[Float](2, 1000).rand()
+    val tfResult = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult.map( BigDLResult.toTensor, (v1, v2) => {
+      assert(abs(v1 - v2) < 2e-7);
+      v2
+    })
+    model.backward(input, gradient)
+  }
+
   private def processPath(path: String): String = {
     if (path.contains(":")) {
       path.substring(1)

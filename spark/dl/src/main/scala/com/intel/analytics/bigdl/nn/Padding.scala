@@ -66,7 +66,7 @@ class Padding[T: ClassTag](
       output.narrow(dim, index + pad, input.size(dim) - (index - 1)).
         copy(input.narrow(dim, index, input.size(dim) - (index - 1)))
     }
-    Tensor(output)
+    output.clone()
   }
 
 

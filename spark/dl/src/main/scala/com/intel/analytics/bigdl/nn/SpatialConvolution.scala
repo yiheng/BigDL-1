@@ -52,19 +52,31 @@ class SpatialConvolution[T: ClassTag](
   val propagateBack: Boolean = true, // propagate gradient back
   private var initMethod: InitializationMethod = Default,
   val wRegularizer: Regularizer[T] = null,
-  val bRegularizer: Regularizer[T] = null
+  val bRegularizer: Regularizer[T] = null,
+  val initWeight: Tensor[T] = null,
+  val initBias: Tensor[T] = null,
+  val initGradWeight: Tensor[T] = null,
+  val initGradBias: Tensor[T] = null
 )(implicit ev: TensorNumeric[T]) extends TensorModule[T] {
 
   require(nInputPlane % nGroup == 0, "Number of input channels should be multiples of group.")
   require(nOutputPlane % nGroup == 0, "Number of output channels should be multiples of group.")
 
-  val weight: Tensor[T] = Tensor[T](nGroup, nOutputPlane / nGroup,
-    nInputPlane / nGroup, kernelH, kernelW)
-  val bias: Tensor[T] = Tensor[T](nOutputPlane)
+  val weight: Tensor[T] = if (initWeight != null) {
+    initWeight
+  } else {
+    Tensor[T](nGroup, nOutputPlane / nGroup, nInputPlane / nGroup, kernelH, kernelW)
+  }
 
-  val gradWeight: Tensor[T] = Tensor[T](nGroup, nOutputPlane / nGroup, nInputPlane / nGroup,
-    kernelH, kernelW)
-  val gradBias: Tensor[T] = Tensor[T](nOutputPlane)
+  val bias: Tensor[T] = if (initBias != null) initBias else Tensor[T](nOutputPlane)
+
+  val gradWeight: Tensor[T] = if (initGradWeight != null) {
+    initGradWeight
+  } else {
+    Tensor[T](nGroup, nOutputPlane / nGroup, nInputPlane / nGroup, kernelH, kernelW)
+  }
+
+  val gradBias: Tensor[T] = if (initGradBias != null) initGradBias else Tensor[T](nOutputPlane)
 
   var fInput = Tensor[T]()
   var fGradInput = Tensor[T]()
@@ -102,14 +114,23 @@ class SpatialConvolution[T: ClassTag](
     initMethod match {
       case Default =>
         val stdv = 1.0 / math.sqrt(kernelW * kernelH * nInputPlane)
-        weight.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
-        bias.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
+        if (initWeight == null) {
+          weight.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
+        }
+
+        if (initBias == null) {
+          bias.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
+        }
       case Xavier =>
         val fanIn = nInputPlane * kernelH * kernelW
         val fanOut = nOutputPlane * kernelH * kernelW
         val stdv = math.sqrt(6.0 / (fanIn + fanOut))
-        weight.apply1(_ => ev.fromType[Double](RNG.uniform(-stdv, stdv)))
-        bias.fill(ev.fromType(0))
+        if (initWeight == null) {
+          weight.apply1(_ => ev.fromType[Double](RNG.uniform(-stdv, stdv)))
+        }
+        if (initBias == null) {
+          bias.fill(ev.fromType(0))
+        }
       case _ => throw new IllegalArgumentException()
     }
     zeroGradParameters()

@@ -51,14 +51,22 @@ class Linear[T: ClassTag](
   private var initMethod: InitializationMethod = Default,
   withBias: Boolean = true,
   wRegularizer: Regularizer[T] = null,
-  bRegularizer: Regularizer[T] = null
+  bRegularizer: Regularizer[T] = null,
+  initWeight: Tensor[T] = null,
+  initBias: Tensor[T] = null,
+  initGradWeight: Tensor[T] = null,
+  initGradBias: Tensor[T] = null
 )(implicit ev: TensorNumeric[T]) extends TensorModule[T] {
-  val weight: Tensor[T] = Tensor[T](outputSize, inputSize)
-  val bias: Tensor[T] = if (withBias) Tensor[T](outputSize) else null
+  val weight: Tensor[T] =
+    if (initWeight != null) initWeight else Tensor[T](outputSize, inputSize)
+  val bias: Tensor[T] =
+    if (initBias != null) initBias else if (withBias) Tensor[T](outputSize) else null
   val addBuffer: Tensor[T] = Tensor[T]()
 
-  val gradWeight: Tensor[T] = Tensor[T]()
-  val gradBias: Tensor[T] = if (withBias) Tensor[T]() else null
+  val gradWeight: Tensor[T] =
+    if (initGradWeight != null) initGradWeight else Tensor[T]()
+  val gradBias: Tensor[T] =
+    if (initGradBias != null) initGradBias else if (withBias) Tensor[T]() else null
   reset()
 
   def setInitMethod(initMethod: InitializationMethod): this.type = {
@@ -70,14 +78,22 @@ class Linear[T: ClassTag](
     initMethod match {
       case Default =>
         val stdv = 1.0 / math.sqrt(weight.size(2))
-        weight.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
-        if (withBias) bias.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
+        if (initWeight == null) {
+          weight.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
+        }
+        if (withBias && initBias == null) {
+          bias.apply1(_ => ev.fromType[Double](RNG.uniform(0, 1) * 2 * stdv - stdv))
+        }
       case Xavier =>
         val fanIn = weight.size(2)
         val fanOut = weight.size(1)
         val stdv = math.sqrt(6.0 / (fanIn + fanOut))
-        weight.apply1(_ => ev.fromType[Double](RNG.uniform(-stdv, stdv)))
-        if (withBias) bias.fill(ev.fromType(0))
+        if (initWeight == null) {
+          weight.apply1(_ => ev.fromType[Double](RNG.uniform(-stdv, stdv)))
+        }
+        if (withBias && initBias == null) {
+          bias.fill(ev.fromType(0))
+        }
       case _ =>
         throw new IllegalArgumentException(s"Unsupported initMethod type ${initMethod}")
     }
@@ -103,11 +119,11 @@ class Linear[T: ClassTag](
       }
 
       if (addBuffer.nElement() != nFrame) {
-        addBuffer.resize(Array(nFrame)).fill(ev.fromType[Int](1))
+        addBuffer.resize(Array(nFrame)).fill(ev.one)
       }
 
-      output.addmm(ev.fromType[Int](0), output, ev.fromType[Int](1), input, weight.t)
-      if (withBias) output.addr(ev.fromType[Int](1), addBuffer, bias)
+      output.addmm(ev.zero, output, ev.one, input, weight.t)
+      if (withBias) output.addr(ev.one, addBuffer, bias)
     }
     output
   }
@@ -240,9 +256,13 @@ object Linear {
       initMethod: InitializationMethod = Default,
       withBias: Boolean = true,
       wRegularizer: Regularizer[T] = null,
-      bRegularizer: Regularizer[T] = null
+      bRegularizer: Regularizer[T] = null,
+      initWeight: Tensor[T] = null,
+      initBias: Tensor[T] = null,
+      initGradWeight: Tensor[T] = null,
+      initGradBias: Tensor[T] = null
   )(implicit ev: TensorNumeric[T]) : Linear[T] = {
     new Linear[T](inputSize, outputSize, initMethod,
-      withBias, wRegularizer, bRegularizer)
+      withBias, wRegularizer, bRegularizer, initWeight, initBias, initGradWeight, initGradBias)
   }
 }

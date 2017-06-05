@@ -27,18 +27,24 @@ def main():
     1. mkdir model
     2. python inception_resnet_v2.py
     3. wget https://raw.githubusercontent.com/tensorflow/tensorflow/v1.0.0/tensorflow/python/tools/freeze_graph.py
-    4. python freeze_graph.py --input_graph model/inception_resnet_v2.pbtxt --input_checkpoint model/inception_resnet_v2.chkp --output_node_names="InceptionResnetV2/AuxLogits/Logits/BiasAdd,InceptionResnetV2/Logits/Predictions" --output_graph inception_resnet_v2.pb
+    4. python freeze_graph.py --input_graph model/inception_resnet_v2.pbtxt --input_checkpoint model/inception_resnet_v2.chkp --output_node_names="InceptionResnetV2/AuxLogits/Logits/BiasAdd,InceptionResnetV2/Logits/Logits/BiasAdd,output1,output2" --output_graph inception_resnet_v2_save.pb
     """
     dir = os.path.dirname(os.path.realpath(__file__))
     batch_size = 5
     height, width = 299, 299
     num_classes = 1001
-    inputs = tf.placeholder(tf.float32, [None, height, width, 3])
-    net, end_points = inception_resnet_v2.inception_resnet_v2(inputs)
+    # inputs = tf.placeholder(tf.float32, [None, height, width, 3])
+    inputs = tf.Variable(tf.random_uniform((2, height, width, 3)), name='input')
+    net, end_points = inception_resnet_v2.inception_resnet_v2(inputs,is_training = False)
+    output1 = tf.Variable(tf.random_uniform(tf.shape(net)),name='output1')
+    result1 = tf.assign(output1,net)
+    output2 = tf.Variable(tf.random_uniform(tf.shape(end_points['AuxLogits'])),name='output2')
+    result2 = tf.assign(output2,end_points['AuxLogits'])
     saver = tf.train.Saver()
     with tf.Session() as sess:
         init = tf.global_variables_initializer()
         sess.run(init)
+        sess.run([result1,result2])
         checkpointpath = saver.save(sess, dir + '/model/inception_resnet_v2.chkp')
         tf.train.write_graph(sess.graph, dir + '/model', 'inception_resnet_v2.pbtxt')
         tf.summary.FileWriter(dir + '/log', sess.graph)

@@ -504,6 +504,35 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     model.backward(input, gradient)
   }
 
+  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+    "after loading slim inception_resnet_v2" in {
+    val resource = getClass().getClassLoader().getResource("tf")
+    val path = processPath(resource.getPath()) + JFile.separator + "inception_resnet_v2_save.pb"
+    val results = TensorflowLoader.parse(path)
+    val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-2))
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      Seq("InceptionResnetV2/Logits/Logits/BiasAdd", "InceptionResnetV2/AuxLogits/Logits/BiasAdd"))
+    val input = TFToBigDL.toTensor(results.get(0).getAttrMap.get("value").getTensor)
+      .transpose(2, 4).transpose(3, 4).contiguous()
+    val gradient1 = Tensor[Float](2, 1001).rand()
+    val gradient2 = Tensor[Float](2, 1001).rand()
+    val tfResult1 = TFToBigDL.toTensor(results.get(results.size()-2)
+      .getAttrMap.get("value").getTensor)
+    val tfResult2 = TFToBigDL.toTensor(results.get(results.size()-1)
+      .getAttrMap.get("value").getTensor)
+    val BigDLResult = model.forward(input)
+
+    tfResult1.map( BigDLResult.toTable(1), (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    tfResult2.map( BigDLResult.toTable(2), (v1, v2) => {
+      assert(abs(v1 - v2) < 1e-7);
+      v2
+    })
+    model.backward(input, T(gradient1, gradient2))
+  }
+
   private def processPath(path: String): String = {
     if (path.contains(":")) {
       path.substring(1)

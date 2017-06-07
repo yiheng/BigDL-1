@@ -745,19 +745,22 @@ object PaddingTF extends TFToBigDL{
     val paddings = TFToBigDL.toTensor(
       tfGraph.source.prevNodes(1).element.getAttrMap.get("value").getTensor)
     val pad = ArrayBuffer[Int]()
-    val dims = ArrayBuffer[Int]()
     val dataFormatMatch = Map("N" -> 0, "H" -> 2, "W" -> 3, "C" -> 1)
+    val padding = Sequential[Float]()
 
     for(i <- 1 to paddings.size(1)) {
       if (paddings(Array(i, 1)) != 0 || paddings(Array(i, 2)) != 0 ) {
-        dims += dataFormatMatch(TFToBigDL.dataFormat.charAt(i-1).toString) + 1
-        if (paddings(Array(i, 1)) != 0) pad += -paddings(Array(i, 1)).toInt else pad += 0
-        if (paddings(Array(i, 2)) != 0) pad += paddings(Array(i, 2)).toInt else pad += 0
+        val dim = dataFormatMatch(TFToBigDL.dataFormat.charAt(i-1).toString) + 1
+        if (paddings(Array(i, 1)) != 0) {
+          padding.add(Padding[Float](dim, -paddings(Array(i, 1)).toInt, 4))
+        }
+        if (paddings(Array(i, 2)) != 0) {
+          padding.add(Padding[Float](dim, paddings(Array(i, 1)).toInt, 4))
+        }
       }
     }
 
-    Padding[Float](dims.toArray, pad.toArray, 4, 0.0, 1)
-      .asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+    padding.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 
@@ -776,9 +779,13 @@ object MeanTF extends TFToBigDL{
       tfGraph.source.prevNodes(1).element.getAttrMap.get("value").getTensor)
     val dim = ArrayBuffer[Int]()
     val dataFormatMatch = Map("N" -> 0, "H" -> 2, "W" -> 3, "C" -> 1)
-    for (i <- 1 to dims.size(1)) dim += dataFormatMatch(TFToBigDL
-      .dataFormat.charAt(dims.valueAt(i).toInt).toString) + 1
-    MeanMulDim[Float](dim.toArray).asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
+    val mean = Sequential[Float]()
+    for (i <- 1 to dims.size(1)) {
+      dim += dataFormatMatch(TFToBigDL
+        .dataFormat.charAt(dims.valueAt(i).toInt).toString) + 1
+    }
+    dim.foreach(i => mean.add(Mean[Float](i, resize = true)))
+    mean.asInstanceOf[AbstractModule[Activity, Tensor[Float], Float]]
   }
 }
 

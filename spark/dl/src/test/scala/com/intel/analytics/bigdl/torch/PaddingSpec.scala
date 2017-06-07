@@ -15,7 +15,7 @@
  */
 package com.intel.analytics.bigdl.torch
 
-import com.intel.analytics.bigdl.nn.Padding
+import com.intel.analytics.bigdl.nn.{Padding, Sequential}
 import com.intel.analytics.bigdl.tensor.Tensor
 import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
 
@@ -130,9 +130,11 @@ class PaddingSpec extends TorchSpec {
     println("Test case : Padding, Torch : " + luaTime + " s, Scala : " + scalaTime / 1e9 + " s")
   }
 
-  "A Padding(Array(Array(2, 3), Array(-1, 1, -2, 2))" should
+  "A Padding for two dimension" should
     "generate correct output and grad for multi dimension" in {
-    val layer = Padding[Float](Array(2, 3), Array(-1, 1, -1, 1), 3, 0.0, 1)
+    val layer = Sequential[Float]()
+    layer.add(Padding[Float](2, -1, 3)).add(Padding[Float](2, 1, 3))
+      .add(Padding[Float](3, -1, 3)).add(Padding[Float](3, 1, 3))
     val input = Tensor[Float](1, 2, 2)
     input(Array(1, 1, 1)) = 0.01f
     input(Array(1, 1, 2)) = 0.02f

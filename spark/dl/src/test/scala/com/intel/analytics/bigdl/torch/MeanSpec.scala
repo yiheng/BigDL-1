@@ -15,7 +15,7 @@
  */
 package com.intel.analytics.bigdl.torch
 
-import com.intel.analytics.bigdl.nn.{Mean, MeanMulDim}
+import com.intel.analytics.bigdl.nn.{Mean, Sequential}
 import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.utils.RandomGenerator
 
@@ -81,8 +81,9 @@ class MeanSpec extends TorchSpec {
     println("Test case : Mean, Torch : " + luaTime + " s, Scala : " + scalaTime / 1e9 + " s")
   }
 
-  "A MeanMulDim(Array(2, 3), 3)" should "generate correct output and grad for multi dimension" in {
-    val layer = MeanMulDim[Float](Array(2, 3), 3)
+  "A Mean for two dimension" should "generate correct output and grad for multi dimension" in {
+    val layer = Sequential[Float]()
+    layer.add(Mean[Float](2, 3, true)).add(Mean[Float](3, 3, true))
     val input = Tensor[Float](1, 3, 3)
     input(Array(1, 1, 1)) = 0.01f
     input(Array(1, 1, 2)) = 0.02f

@@ -201,12 +201,14 @@ object PaddingToTF extends BigDLToTF {
   override def toTFDef(module: AbstractModule[_, _, _], inputs: Seq[NodeDef]): Seq[NodeDef] = {
     require(inputs.length == 1, "Padding only accept one input")
     val layer = module.asInstanceOf[Padding[_]]
-    val padding = Tensor[Float](layer.dim.length, 2)
-    var i = 0
-    while(i < layer.dim.length) {
-      padding.setValue(i + 1, 1, layer.dim(i))
-      padding.setValue(i + 1, 2, layer.dim(i))
-      i += 1
+    val padding = Tensor[Float](1, 2)
+    if (layer.pad < 0) {
+      padding.setValue(1, 1, -layer.pad)
+      padding.setValue(1, 2, 0)
+    }
+    else {
+      padding.setValue(1, 1, 0)
+      padding.setValue(1, 2, layer.pad)
     }
     val paddingsNode = const(padding, layer.getName() + "/padding", DataType.DT_INT32)
     val padNode = pad(inputs(0), paddingsNode, layer.getName() + "/output")
@@ -276,12 +278,9 @@ object MeanToTF extends BigDLToTF {
   override def toTFDef(module: AbstractModule[_, _, _], inputs: Seq[NodeDef]): Seq[NodeDef] = {
     require(inputs.length == 1, "Mean only accept one input")
     val layer = module.asInstanceOf[Mean[_]]
-    val dimsTensor = Tensor[Float](layer.dimension.length)
-    var i = 0
-    while(i < layer.dimension.length) {
-      dimsTensor.setValue(i + 1, layer.dimension(i))
-      i += 1
-    }
+    val dimsTensor = Tensor[Float](layer.dimension)
+    dimsTensor.setValue(1, layer.dimension)
+
     val dims = const(dimsTensor, layer.getName() + "/dims")
     val mean = reduceMean(inputs(0), dims, false, layer.getName() + "/output")
     Seq(mean, dims)

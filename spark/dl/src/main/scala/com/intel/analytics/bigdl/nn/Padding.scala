@@ -39,23 +39,23 @@ import scala.reflect.ClassTag
  */
 @SerialVersionUID(- 3401298839313169602L)
 class Padding[T: ClassTag](
-  val dim: Array[Int],
-  val pad: Array[Int],
+  val dim: Int,
+  val pad: Int,
   val nInputDim: Int,
   val value: Double = 0.0,
   val nIndex: Int = 1)(implicit ev: TensorNumeric[T]) extends TensorModule[T] {
 
   var outputSize = Storage[Int]()
 
-  def padInput(input: Tensor[T], dimension: Int, padding: Int): Tensor[T] = {
+  override def updateOutput(input: Tensor[T]): Tensor[T] = {
     outputSize.resize(input.dim()).copy(Storage(input.size()))
-    val dim = if (input.dim() != nInputDim) dimension + 1 else dimension
+    val dim = if (input.dim() != nInputDim) this.dim + 1 else this.dim
 
-    outputSize(dim - 1) += math.abs(padding)
+    outputSize(dim - 1) += math.abs(this.pad)
     output.resize(outputSize.array()).fill(ev.fromType(value))
 
-    val index = if (padding > 0) input.size(dim) - nIndex + 2 else nIndex
-    val pad = if (padding > 0) padding else -padding
+    val index = if (this.pad > 0) input.size(dim) - nIndex + 2 else nIndex
+    val pad = if (this.pad > 0) this.pad else -this.pad
 
     if (index == 1) {
       output.narrow(dim, 1 + pad, input.size(dim)).copy(input)
@@ -66,63 +66,32 @@ class Padding[T: ClassTag](
       output.narrow(dim, index + pad, input.size(dim) - (index - 1)).
         copy(input.narrow(dim, index, input.size(dim) - (index - 1)))
     }
-    output.clone()
-  }
-
-
-
-  override def updateOutput(input: Tensor[T]): Tensor[T] = {
-    var tempPadding = input
-    for (i <- this.dim.indices) {
-      if (this.pad(2*i + 0) != 0) {
-        tempPadding = padInput(tempPadding, this.dim(i), this.pad(2*i + 0))
-      }
-      if (this.pad(2*i + 1) != 0) {
-        tempPadding = padInput(tempPadding, this.dim(i), this.pad(2 * i + 1))
-      }
-    }
     output
   }
 
-  def padOutput(i: Int, input: Tensor[T], gradOutput: Tensor[T]): Tensor[T] = {
-    val dim = this.dim(i)
-    val pad = math.abs(this.pad(2*i))
-    gradOutput.narrow(dim, 1 + pad, input.size(dim))
-  }
 
   override def updateGradInput(input: Tensor[T], gradOutput: Tensor[T]): Tensor[T] = {
     gradInput.resizeAs(input)
 
-    if (this.dim.length == 1 && (this.pad(0) == 0 || this.pad(1) == 0)) {
-      val effectIndex = if (this.pad(0) != 0) 0 else 1
-      val dim = if (input.dim() != nInputDim) this.dim(0) + 1 else this.dim(0)
-      val index = if (this.pad(effectIndex) > 0) input.size(dim) - nIndex + 2 else nIndex
-      val pad = if (this.pad(effectIndex) > 0) this.pad(effectIndex) else -this.pad(effectIndex)
+    val dim = if (input.dim() != nInputDim) this.dim + 1 else this.dim
+    val index = if (this.pad > 0) input.size(dim) - nIndex + 2 else nIndex
+    val pad = if (this.pad > 0) this.pad else -this.pad
 
-      if (index == 1) {
-        gradInput.copy(gradOutput.narrow(dim, 1 + pad, input.size(dim)))
-      } else if (index == input.size(dim) + 1) {
-        gradInput.copy(gradOutput.narrow(dim, 1, input.size(dim)))
-      } else {
-        gradInput.narrow(dim, 1, index - 1).
-          copy(gradOutput.narrow(dim, 1, index - 1))
-        gradInput.narrow(dim, index, input.size(dim) - (index - 1)).copy(
-          gradOutput.narrow(dim, index + pad, input.size(dim) - (index - 1)))
-      }
-      return gradInput
+    if (index == 1) {
+      gradInput.copy(gradOutput.narrow(dim, 1 + pad, input.size(dim)))
+    } else if (index == input.size(dim) + 1) {
+      gradInput.copy(gradOutput.narrow(dim, 1, input.size(dim)))
+    } else {
+      gradInput.narrow(dim, 1, index - 1).
+        copy(gradOutput.narrow(dim, 1, index - 1))
+      gradInput.narrow(dim, index, input.size(dim) - (index - 1)).copy(
+        gradOutput.narrow(dim, index + pad, input.size(dim) - (index - 1)))
     }
-    else {
-      var tempInput = gradOutput
-      for (i <- this.dim.indices) {
-        tempInput = padOutput(i, input, tempInput)
-      }
-      gradInput.copy(tempInput)
-      return gradInput
-    }
+    gradInput
   }
 
   override def toString(): String = {
-    s"${getPrintName}($dim, $pad, $nInputDim, $value, $nIndex)"
+    s"nn.Padding ($dim, $pad, $nInputDim, $value, $nIndex)"
   }
 
   override def canEqual(other: Any): Boolean = other.isInstanceOf[Padding[T]]
@@ -146,26 +115,12 @@ class Padding[T: ClassTag](
   }
 }
 
-object Padding {
+object Padding{
   def apply[@specialized(Float, Double) T: ClassTag](
-      dim: Int,
-      pad: Int,
-      nInputDim: Int,
-      value: Double = 0.0,
-      nIndex: Int = 1)(implicit ev: TensorNumeric[T]): Padding[T] = {
-    if (pad > 0) {
-      new Padding[T](Array(dim), Array(0, pad), nInputDim, value, nIndex)
-    } else {
-      new Padding[T](Array(dim), Array(pad, 0), nInputDim, value, nIndex)
-    }
-  }
-
-  def apply[@specialized(Float, Double) T: ClassTag](
-    dim: Array[Int],
-    pad: Array[Int],
+    dim: Int,
+    pad: Int,
     nInputDim: Int,
-    value: Double,
-    nIndex: Int)(implicit ev: TensorNumeric[T]) : Padding[T] = {
+    value: Double = 0.0,
+    nIndex: Int = 1)(implicit ev: TensorNumeric[T]) : Padding[T] =
     new Padding[T](dim, pad, nInputDim, value, nIndex)
-  }
 }

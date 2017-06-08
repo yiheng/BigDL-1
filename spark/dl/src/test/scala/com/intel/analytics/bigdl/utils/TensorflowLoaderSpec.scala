@@ -27,6 +27,7 @@ import org.apache.spark.rdd.RDD
 import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
 import com.intel.analytics.bigdl.utils.TestUtils.processPath
 import scala.math._
+import scala.sys.process._
 
 object TensorflowLoaderSpec {
   private val data1 = Array(0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.1f)
@@ -504,10 +505,15 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     model.backward(input, gradient)
   }
 
-  "TensorFlow loader" should "have the same inferrence result with tensorflow " +
+  "TensorFlow loader" should "run the python to save the modle and " +
+    "have the same inferrence result with tensorflow " +
     "after loading slim inception_resnet_v2" in {
+    // check python path for tensorflow models
+    tfCheck()
+    (("python " + testScriptsPath("inception_resnet_v2.py")) !!)
     val resource = getClass().getClassLoader().getResource("tf")
-    val path = processPath(resource.getPath()) + JFile.separator + "inception_resnet_v2_save.pb"
+    val path = processPath(resource.getPath()) + JFile.separator +
+      "loadTest" + JFile.separator + "inception_resnet_v2_save.pb"
     val results = TensorflowLoader.parse(path)
     val tfGraph = TensorflowLoader.buildTFGraph(results.subList(0, results.size()-2))
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
@@ -533,6 +539,7 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
     model.backward(input, T(gradient1, gradient2))
   }
 
+
   private def processPath(path: String): String = {
     if (path.contains(":")) {
       path.substring(1)
@@ -540,4 +547,23 @@ class TensorflowLoaderSpec extends FlatSpec with Matchers with BeforeAndAfter {
       path
     }
   }
+
+  private def testScriptsPath(script: String) : String = {
+    val resource = getClass().getClassLoader().getResource("tf")
+    processPath(resource.getPath()) + JFile.separator + "loadTest" +
+      JFile.separator + script
+  }
+
+  private def tfCheck(): Unit = {
+    try {
+      val exitValue = ((Seq("python", "-c", "import sys; print ','.join(sys.path)"))!!)
+      ((Seq("python", "-c", "import tensorflow"))!!)
+      if ( ! exitValue.contains("models")) {
+        cancel("Tensorflow models path is not exported")
+      }
+    } catch {
+      case _: Throwable => cancel("python or tensorflow is not installed")
+    }
+  }
+
 }

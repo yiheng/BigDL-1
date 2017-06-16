@@ -371,9 +371,7 @@ class TensorflowLoaderSpec extends TensorflowSpecHelper{
     val tfNodes = TensorflowLoader.parse(modelFile)
 
     // filter node for gradient computing
-    val graphNode = tfNodes.asScala.filter(!_.getName.contains("grad"))
-    // tfNodes.asScala.foreach(println(_))
-    val tfGraph = TensorflowLoader.buildTFGraph(graphNode.asJava, endPoints.map(_.split(":")(0)))
+    val tfGraph = TensorflowLoader.buildTFGraph(tfNodes, endPoints.map(_.split(":")(0)))
     val context = new mutable.HashMap[NodeDef, (Tensor[Float], Tensor[Float])]
     val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
       endPoints.map(_.split(":")(0)), ByteOrder.LITTLE_ENDIAN, Some(context))
@@ -437,7 +435,6 @@ class TensorflowLoaderSpec extends TensorflowSpecHelper{
       val pairs = context.keySet.map{
         x =>
           val name = s"${x.getName}_grad$i"
-          // tfGradTensorsMap.keySet should contain(name)
           (context(x)._2, tfGradTensorsMap.get(name).getOrElse(null))
       }.toSeq.filter(_._2 != null)
       comparePair ++ pairs

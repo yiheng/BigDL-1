@@ -81,6 +81,9 @@ def run_model(end_points, output_path, model_scope=None):
         backward = opt.compute_gradients(end_point, var_list=tmp_vars, grad_loss=grad_input)
         j = 0
         for gradients, tensor in backward:
+            print gradients
+            print tensor
+            print '\n'
             grad_var = tf.Variable(tf.random_uniform(tf.shape(tensor)), 
                 name='{}_grad{}'.format(tensor.name[:-2], i))
             grad_vars.append(grad_var)

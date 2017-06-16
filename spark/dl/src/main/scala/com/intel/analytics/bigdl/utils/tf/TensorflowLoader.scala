@@ -100,7 +100,12 @@ object TensorflowLoader{
 
     // Connect nodes
     name2Node.valuesIterator.foreach(n => {
-      n.element.getInputList.asScala.foreach(name2Node(_) -> n)
+      n.element.getInputList.asScala.foreach{
+        input =>
+          // It is tricky here, remove the first char in the name of control dep node
+          val name = if (input.charAt(0) == '^') input.substring(1) else input
+          name2Node(name) -> n
+      }
     })
 
     // Build graph

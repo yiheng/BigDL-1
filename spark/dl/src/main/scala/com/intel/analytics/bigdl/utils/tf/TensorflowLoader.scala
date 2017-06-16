@@ -122,7 +122,8 @@ object TensorflowLoader{
       tfGraph: DirectedGraph[NodeDef],
       inputs: Seq[String],
       outputs: Seq[String],
-      byteOrder: ByteOrder
+      byteOrder: ByteOrder,
+      ctx: Option[Context[T]] = None
     )(implicit ev: TensorNumeric[T]): Module[T] = {
     import scala.collection.JavaConverters._
 
@@ -131,7 +132,7 @@ object TensorflowLoader{
       Node[AbstractModule[Activity, Tensor[T], T]]]()
     val nameToNode =
       new mutable.HashMap[String, Node[AbstractModule[Activity, Tensor[T], T]]]()
-    val context = new mutable.HashMap[NodeDef, (Tensor[T], Tensor[T])]
+    val context = ctx.getOrElse(new mutable.HashMap[NodeDef, (Tensor[T], Tensor[T])])
 
     // BFS to keep the input order same
     tfGraph.BFS.foreach(n => {

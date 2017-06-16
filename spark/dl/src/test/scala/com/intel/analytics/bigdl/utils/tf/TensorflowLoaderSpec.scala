@@ -28,7 +28,11 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import com.intel.analytics.bigdl.numeric.NumericFloat
+import org.tensorflow.framework.NodeDef
 
+import scala.collection.mutable
+import scala.sys.process._
+import scala.math._
 
 object TensorflowLoaderSpec {
   private val data1 = Array(0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.1f)
@@ -282,8 +286,12 @@ class TensorflowLoaderSpec extends TensorflowSpecHelper{
   "Tensorflow lenet" should "be load correctly" in {
     testModel("lenet", Seq("LeNet/pool2/MaxPool:0"), true).foreach {
       case(tf, bigdl) =>
-        val transposed = bigdl.transpose(2, 3).transpose(3, 4)
-        tf.almostEqual(transposed, 1e-6) should be(true)
+        tf.almostEqual(bigdl, 1e-6) should be(true)
+      // case(tf, bigdl) =>
+      //   val transposed = bigdl.transpose(2, 3).transpose(3, 4)
+      //   transposed.size().foreach(println(_))
+      //   bigdl.size().foreach(println(_))
+      //   tf.almostEqual(transposed, 1e-6) should be(true)
     }
   }
 
@@ -363,13 +371,18 @@ class TensorflowLoaderSpec extends TensorflowSpecHelper{
       "error when run the model script")
 
     // Load the model and input/output tensors
+    import collection.JavaConverters._
     val modelFile = tmpLocation + s + "model.pb"
     val tfNodes = TensorflowLoader.parse(modelFile)
-    val tfGraph = TensorflowLoader.buildTFGraph(tfNodes, endPoints.map(_.split(":")(0)))
-    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
-      endPoints.map(_.split(":")(0)), ByteOrder.LITTLE_ENDIAN)
 
-    import collection.JavaConverters._
+    // filter node for gradient computing
+    val graphNode = tfNodes.asScala.filter(!_.getName.contains("grad"))
+    // tfNodes.asScala.foreach(println(_))
+    val tfGraph = TensorflowLoader.buildTFGraph(graphNode.asJava, endPoints.map(_.split(":")(0)))
+    val context = new mutable.HashMap[NodeDef, (Tensor[Float], Tensor[Float])]
+    val model = TensorflowLoader.buildBigDLModel(tfGraph, Seq("input"),
+      endPoints.map(_.split(":")(0)), ByteOrder.LITTLE_ENDIAN, Some(context))
+
     // Compare the tensor contents
     val tfInputTensor = tfNodes.asScala.filter(_.getName == "input")(0)
       .getAttrMap.get("value").getTensor
@@ -391,8 +404,51 @@ class TensorflowLoaderSpec extends TensorflowSpecHelper{
       val t = model.forward(transposeInput).toTable
       (1 to endPoints.length).map(t[Tensor[Float]](_))
     }
-    tfOutputTensors.zip(bigdlOutputs).map(x =>
-      (TensorflowToBigDL.toTensor(x._1, ByteOrder.LITTLE_ENDIAN), x._2))
+
+    // do backward
+    val gradInputs = (0 until endPoints.length).map{
+      i =>
+        val t = tfNodes.asScala.filter(_.getName == s"grad_input$i")(0)
+          .getAttrMap.get("value").getTensor
+        val tensor = TensorflowToBigDL.toTensor(t, ByteOrder.LITTLE_ENDIAN)
+        if (transInput && tensor.dim() == 4) {
+          tensor.transpose(4, 3).transpose(3, 2)
+        } else {
+          tensor
+        }
+    }
+
+    // find all gradients tensor in tensorflow graph
+    val tfGradTensorsMap = context.keySet.map{
+      node =>
+        val t = tfNodes.asScala.filter(_.getName.contains(node.getName + "_grad"))(0)
+        t.getName ->
+          TensorflowToBigDL.toTensor(t.getAttrMap.get("value").getTensor, ByteOrder.LITTLE_ENDIAN)
+    }.toMap
+
+    val comparePair = tfOutputTensors.zip(bigdlOutputs).map{
+      x =>
+        val tensor = TensorflowToBigDL.toTensor(x._1, ByteOrder.LITTLE_ENDIAN)
+        if (transInput && tensor.dim() == 4) {
+          (tensor.transpose(4, 3).transpose(3, 2), x._2)
+        } else {
+          (tensor, x._2)
+        }
+    }
+
+    // do backward for each output and its corresponding gradient input
+    for (i <- 0 until gradInputs.length) {
+      model.backward(transposeInput, gradInputs(i))
+      val pairs = context.keySet.map{
+        x =>
+          val name = s"${x.getName}_grad$i"
+          // tfGradTensorsMap.keySet should contain(name)
+          (context(x)._2, tfGradTensorsMap.get(name).getOrElse(null))
+      }.toSeq.filter(_._2 != null)
+      comparePair ++ pairs
+    }
+
+    comparePair
   }
 
   private def processPath(path: String): String = {

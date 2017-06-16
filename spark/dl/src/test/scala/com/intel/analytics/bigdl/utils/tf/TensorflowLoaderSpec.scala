@@ -287,11 +287,6 @@ class TensorflowLoaderSpec extends TensorflowSpecHelper{
     testModel("lenet", Seq("LeNet/pool2/MaxPool:0"), true).foreach {
       case(tf, bigdl) =>
         tf.almostEqual(bigdl, 1e-6) should be(true)
-      // case(tf, bigdl) =>
-      //   val transposed = bigdl.transpose(2, 3).transpose(3, 4)
-      //   transposed.size().foreach(println(_))
-      //   bigdl.size().foreach(println(_))
-      //   tf.almostEqual(transposed, 1e-6) should be(true)
     }
   }
 

@@ -97,7 +97,7 @@ def run_model(end_points, output_path, model_scope=None):
         sess.run(grad_results)
         saver.save(sess, output_path + '/model.chkp')
         tf.train.write_graph(sess.graph, output_path, 'model.pbtxt')
-        tf.summary.FileWriter(output_path + '/log', sess.graph)
+        # tf.summary.FileWriter(output_path + '/log', sess.graph)
 
     input_graph = output_path + "/model.pbtxt"    
     input_checkpoint = output_path + "/model.chkp"

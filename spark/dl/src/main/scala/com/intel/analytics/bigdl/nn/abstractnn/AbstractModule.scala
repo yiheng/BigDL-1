@@ -1080,7 +1080,11 @@ abstract class AbstractModule[A <: Activity: ClassTag, B <: Activity: ClassTag, 
   }
 
   def setDnnEngine(loc : Long): this.type = {
-    engineLocation = loc
+    this.engineLocation = loc
+    if (this.isInstanceOf[Container[Activity, Activity, T]]) {
+      this.asInstanceOf[Container[Activity, Activity, T]].
+        modules.map(_.setDnnEngine(loc))
+    }
     this
   }
 
@@ -1104,7 +1108,11 @@ abstract class AbstractModule[A <: Activity: ClassTag, B <: Activity: ClassTag, 
   }
 
   def setStream(loc: Long): this.type = {
-    streamLocation = loc
+    this.streamLocation = loc
+    if (this.isInstanceOf[Container[Activity, Activity, T]]) {
+      this.asInstanceOf[Container[Activity, Activity, T]].
+        modules.map(_.setStream(loc))
+    }
     this
   }
 

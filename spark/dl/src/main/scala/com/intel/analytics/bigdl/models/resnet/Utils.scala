@@ -31,6 +31,7 @@ object Utils {
     checkpoint: Option[String] = None,
     modelSnapshot: Option[String] = None,
     stateSnapshot: Option[String] = None,
+    summaryPath: Option[String] = None,
     optnet: Boolean = false,
     depth: Int = 20,
     classes: Int = 10,
@@ -58,6 +59,9 @@ object Utils {
     opt[String]("cache")
       .text("where to cache the model")
       .action((x, c) => c.copy(checkpoint = Some(x)))
+    opt[String]("summary")
+      .text("where to store the training summary")
+      .action((x, c) => c.copy(summaryPath = Some(x)))
     opt[Boolean]("optnet")
       .text("shared gradients and caches to reduce memory usage")
       .action((x, c) => c.copy(optnet = x))

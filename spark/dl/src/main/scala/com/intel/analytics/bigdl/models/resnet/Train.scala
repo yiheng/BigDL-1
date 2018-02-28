@@ -16,6 +16,9 @@
 
 package com.intel.analytics.bigdl.models.resnet
 
+import java.text.SimpleDateFormat
+import java.util.Date
+
 import com.intel.analytics.bigdl.nn.{CrossEntropyCriterion, Module}
 import com.intel.analytics.bigdl._
 import com.intel.analytics.bigdl.models.resnet.ResNet.{DatasetType, ShortcutType}
@@ -24,6 +27,7 @@ import com.intel.analytics.bigdl.utils.{Engine, LoggerFilter, T, Table}
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.SparkContext
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric._
+import com.intel.analytics.bigdl.visualization.{TrainSummary, ValidationSummary}
 
 object Train {
   LoggerFilter.redirectSparkInfoLogs()
@@ -88,6 +92,16 @@ object Train {
       )
       if (param.checkpoint.isDefined) {
         optimizer.setCheckpoint(param.checkpoint.get, Trigger.everyEpoch)
+      }
+      if (param.summaryPath.isDefined) {
+        val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+        val timeStamp = sdf.format(new Date())
+        val trainSummry = new TrainSummary(param.summaryPath.get,
+          s"resnet-on-cifar10-train-$timeStamp")
+        optimizer.setTrainSummary(trainSummry)
+        val validationSummary = new ValidationSummary(param.summaryPath.get,
+          s"resnet-on-cifar10-val-$timeStamp")
+        optimizer.setValidationSummary(validationSummary)
       }
 
       optimizer

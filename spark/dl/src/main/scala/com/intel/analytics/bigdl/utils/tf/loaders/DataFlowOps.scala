@@ -225,6 +225,8 @@ private[bigdl] class StackPopV2 extends TensorflowOpsLoader {
       new StackPopOps[T, Float]()
     } else if (t == DataType.DT_INT32) {
       new StackPopOps[T, Int]()
+    } else if (t == DataType.DT_BOOL) {
+      new StackPopOps[T, Boolean]()
     } else {
       throw new UnsupportedOperationException(s"Not support load StackPop with type $t")
     }
@@ -259,6 +261,8 @@ private[bigdl] class StackPushV2 extends TensorflowOpsLoader {
       new StackPushOps[T, Float]()
     } else if (t == DataType.DT_INT32) {
       new StackPushOps[T, Int]()
+    } else if (t == DataType.DT_BOOL) {
+      new StackPushOps[T, Boolean]()
     } else {
       throw new UnsupportedOperationException(s"Not support load StackPush with type $t")
     }
@@ -294,6 +298,8 @@ private[bigdl] class StackV2 extends TensorflowOpsLoader {
       new StackCreator[T, Float](stackName)
     } else if (t == DataType.DT_INT32) {
       new StackCreator[T, Int](stackName)
+    } else if (t == DataType.DT_BOOL) {
+      new StackCreator[T, Boolean](stackName)
     } else {
       throw new UnsupportedOperationException(s"Not support load Stack with type $t")
     }

@@ -197,3 +197,14 @@ object TensorflowSaver {
   private def getNameFromObj(name: String) : String = name.substring(0, name.length - 1)
 }
 
+object Main {
+  def main(args: Array[String]): Unit = {
+    // val model = Module.loadTF[Float]("/home/yihengw/graph", Seq("Reshape"), Seq("ArgMax"))
+    val model = Module.loadTF[Float](
+      "/home/yihengw/model/attention_ocr/graph",
+      Seq("shuffle_batch/random_shuffle_queue"),
+      Seq("total_loss"))// ,
+      // binFile = Some("/home/yihengw/model/adv_imagenet_models/model5/model/model.bin"))
+  }
+}
+

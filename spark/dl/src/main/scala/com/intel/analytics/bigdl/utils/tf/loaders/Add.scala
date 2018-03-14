@@ -18,7 +18,7 @@ package com.intel.analytics.bigdl.utils.tf.loaders
 import java.nio.ByteOrder
 
 import com.intel.analytics.bigdl.Module
-import com.intel.analytics.bigdl.nn.{CAddTable, Identity}
+import com.intel.analytics.bigdl.nn.{CAddTable, Identity => IdentityOps}
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 import com.intel.analytics.bigdl.utils.tf.Context
 import com.intel.analytics.bigdl.utils.tf.loaders.Utils.getType
@@ -46,174 +46,230 @@ class Add extends TensorflowOpsLoader {
 class RefSwitch extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class IsVariableInitialized extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class RandomUniformInt extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class PlaceholderWithDefault extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class BarrierInsertMany extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class BarrierTakeMany extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class Barrier extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class Gather extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class Where extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class StringJoin extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class AsString extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class StopGradient extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class SparseToDense extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class FixedUnigramCandidateSampler extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class ComputeAccidentalHits extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class FIFOQueueV2 extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class GatherNd extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class Max extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class RandomStandardNormal extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class ScatterNd extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class DestroyTemporaryVariable extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class Assign extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class TemporaryVariable extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class AssignAdd extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
   }
 }
 
 class RandomShuffleQueueV2 extends TensorflowOpsLoader {
   override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
-    Identity[T]()
+    IdentityOps[T]()
+  }
+}
+
+class Cos extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class Sin extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class AdjustContrastv2 extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class HSVToRGB extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class RGBToHSV extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class DepthToSpace extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class BatchToSpaceND extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class SpaceToBatchND extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
   }
 }

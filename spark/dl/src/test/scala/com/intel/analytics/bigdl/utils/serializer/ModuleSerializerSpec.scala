@@ -27,7 +27,7 @@ import scala.collection.JavaConverters._
 import com.intel.analytics.bigdl.nn.abstractnn.{AbstractModule, Activity, DataFormat}
 import com.intel.analytics.bigdl.nn.ops.{All, Any, ApproximateEqual, ArgMax, BatchMatMul, Cast, Ceil, CrossEntropy, Digamma, Equal, Erf, Erfc, Expm1, Floor, FloorDiv, FloorMod, Greater, GreaterEqual, InTopK, Inv, InvGrad, IsFinite, IsInf, IsNan, Kv2Tensor, L2Loss, Less, LessEqual, Lgamma, LogicalAnd, LogicalNot, LogicalOr, Maximum, Minimum, Mod, ModuleToOperation, NotEqual, OneHot, Pad, Prod, RandomUniform, RangeOps, Rank, ResizeBilinearGrad, ResizeBilinearOps, Rint, Round, SegmentSum, Sign, Slice, SquaredDifference, Substr, TopK, TruncateDiv, TruncatedNormal, Exp => ExpOps, Pow => PowOps, Select => SelectOps, Sum => SumOps, Tile => TileOps}
 import com.intel.analytics.bigdl.nn.tf.{BiasAdd, BroadcastGradientArgs, Const, ControlNodes, Fill, Log1p, ParseExample, Shape, SoftplusGrad, SoftsignGrad, SplitAndSelect, SqrtGrad, StrideSlice, TensorModuleWrapper, Variable, DecodeGif => DecodeGifOps, DecodeJpeg => DecodeJpegOps, DecodePng => DecodePngOps, DecodeRaw => DecodeRawOps}
-import com.intel.analytics.bigdl.nn.{DenseToSparse, SpatialDropout1D, _}
+import com.intel.analytics.bigdl.nn.{DenseToSparse, SpatialDropout1D, Max => MaxOps, _}
 import com.intel.analytics.bigdl.optim.L2Regularizer
 import com.intel.analytics.bigdl.tensor._
 import com.intel.analytics.bigdl.utils.RandomGenerator.RNG
@@ -726,7 +726,7 @@ class ModuleSerializerSpec extends SerializerSpecHelper {
   }
 
   "Max serializer" should "work properly" in {
-    val max = new Max[Float](2).setName("max")
+    val max = new MaxOps[Float](2).setName("max")
     val input = Tensor[Float](2, 3, 4).apply1(_ => Random.nextFloat())
     runSerializationTest(max, input)
   }

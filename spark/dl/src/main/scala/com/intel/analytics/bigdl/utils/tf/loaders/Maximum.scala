@@ -34,6 +34,8 @@ class Maximum extends TensorflowOpsLoader {
       MaximumOps[T, Float]()
     } else if (t == DataType.DT_DOUBLE) {
       MaximumOps[T, Double]()
+    } else if (t == DataType.DT_INT32) {
+      MaximumOps[T, Int]()
     } else {
       throw new UnsupportedOperationException(s"Not support load Maximum when type is $t")
     }

@@ -17,16 +17,53 @@ from sys import argv
 from bigdl.util.tf_utils import dump_model
 
 import tensorflow as tf
+import os.path as op
+import os
 
 def main():
     """
     How to run this script:
-    python export_tf_checkpoint.py meta_file chkp_file save_path
+    python export_tf_checkpoint.py meta_file checkpoint_name save_path
+    
+    or
+    
+    python export_tf_checkpoint.py checkpoint_name save_path
     """
-    saver = tf.train.import_meta_graph(argv[1])
+    meta_file = ""
+    checkpoint = ""
+    save_path = "model"
+
+    if len(argv) == 2:
+        meta_file = argv[1] + ".meta"
+        checkpoint = argv[1]
+    elif len(argv) == 3:
+        meta_file = argv[1] + ".meta"
+        checkpoint = argv[1]
+        save_path = argv[2]
+    elif len(argv) == 4:
+        meta_file = argv[1]
+        checkpoint = argv[2]
+        save_path = argv[3]
+    else:
+        print("Invalid script arguments. How to run the script:\n" +
+              "python export_tf_checkpoint.py checkpoint_name\n" +
+              "python export_tf_checkpoint.py checkpoint_name save_path\n" +
+              "python export_tf_checkpoint.py meta_file checkpoint_name save_path")
+        exit(1)
+
+    saver = tf.train.import_meta_graph(meta_file, clear_devices=True)
+
+    if op.isfile(save_path):
+        print("The save folder is a file. Exit")
+        exit(1)
+
+    if not op.exists(save_path):
+        print("create folder")
+        os.makedirs(save_path)
+
     with tf.Session() as sess:
-        saver.restore(sess, argv[2])
-        dump_model(argv[3], None, sess, argv[2])
+        saver.restore(sess, checkpoint)
+        dump_model(save_path, None, sess, checkpoint)
 
 if __name__ == "__main__":
     main()

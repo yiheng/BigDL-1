@@ -31,7 +31,9 @@ class BiasAdd extends TensorflowOpsLoader {
     , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
 
     val attr = nodeDef.getAttrMap
-    require(getString(attr, "data_format") == "NHWC", "only support NHWC format")
+    if (attr.containsKey("data_format")) {
+      require(getString(attr, "data_format") == "NHWC", "only support NHWC format")
+    }
     BiasAddOp[T]()
   }
 }

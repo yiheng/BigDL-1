@@ -273,3 +273,31 @@ class SpaceToBatchND extends TensorflowOpsLoader {
     IdentityOps[T]()
   }
 }
+
+class NonMaxSuppressionV2 extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class ZerosLike extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class Size extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}
+
+class CropAndResize extends TensorflowOpsLoader {
+  override def build[T: ClassTag](nodeDef: NodeDef, byteOrder: ByteOrder
+    , context: Context[T])(implicit ev: TensorNumeric[T]): Module[T] = {
+    IdentityOps[T]()
+  }
+}

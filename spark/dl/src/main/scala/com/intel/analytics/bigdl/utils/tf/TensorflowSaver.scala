@@ -201,10 +201,10 @@ object Main {
   def main(args: Array[String]): Unit = {
     // val model = Module.loadTF[Float]("/home/yihengw/graph", Seq("Reshape"), Seq("ArgMax"))
     val model = Module.loadTF[Float](
-      "/home/yihengw/model/deeplab/deeplabv3_cityscapes_train/model.pb",
-      Seq("ImageTensor"),
+      "/home/yihengw/model/objectdetection/faster_rcnn_inception_resnet_v2_atrous_oid_2018_01_28/frozen_inference_graph.pb",
+      Seq("image_tensor"),
       Seq(
-        "SemanticPredictions"
+        "detection_boxes", "detection_scores", "num_detections", "detection_classes"
       )) // ,
       // binFile = Some("/home/yihengw/model/entropy_coder/model.bin"))
   }

@@ -16,16 +16,12 @@
 
 package com.intel.analytics.bigdl.optim
 
-import com.intel.analytics.bigdl.dataset.{LocalDataSet, MiniBatch}
 import com.intel.analytics.bigdl._
-import com.intel.analytics.bigdl.models.utils.ModelBroadcast
+import com.intel.analytics.bigdl.dataset.{LocalDataSet, MiniBatch}
 import com.intel.analytics.bigdl.nn.Utils
-import com.intel.analytics.bigdl.nn.abstractnn.Activity
-import com.intel.analytics.bigdl.tensor.Tensor
 import com.intel.analytics.bigdl.tensor.TensorNumericMath.TensorNumeric
 import com.intel.analytics.bigdl.utils._
 import org.apache.log4j.Logger
-import net.openhft.affinity.{Affinity, AffinityLock}
 
 import scala.reflect.ClassTag
 
@@ -53,10 +49,12 @@ class LocalOptimizer[T: ClassTag] (
 
   private val coreNumber = Engine.coreNumber()
 
-  private val subModelNumber = Engine.getEngineType match {
-    case MklBlas => coreNumber
-    case _ => throw new IllegalArgumentException
-  }
+//  private val subModelNumber = Engine.getEngineType match {
+//    case MklBlas => coreNumber
+//    case _ => 1 // throw new IllegalArgumentException
+//  }
+
+  private val subModelNumber = 1
 
   private val workingModels = {
     model.getParameters()
@@ -121,7 +119,6 @@ class LocalOptimizer[T: ClassTag] (
       val lossSum = Engine.default.invokeAndWait(
         (0 until parallelism).map(i =>
           () => {
-            Affinity.setAffinity(i)
             val localModel = workingModels(i)
             localModel.zeroGradParameters()
             localModel.training()
@@ -137,54 +134,53 @@ class LocalOptimizer[T: ClassTag] (
       ).sum
 
       // copy multi-model gradient to the buffer
-      Engine.default.invokeAndWait(
-        (0 until syncGradParallelNum).map(tid =>
-          () => {
-            Affinity.setAffinity(tid)
-            val offset = tid * syncGradTaskSize + math.min(tid, syncGradExtraTask)
-            val length = syncGradTaskSize + (if (tid < syncGradExtraTask) 1 else 0)
-            var i = 0
-            while (i < parallelism) {
-              if (i == 0) {
-                grad.narrow(1, offset + 1, length)
-                  .copy(workingModelWAndG(i)._2.narrow(1, offset + 1, length))
-              } else {
-                grad.narrow(1, offset + 1, length)
-                  .add(workingModelWAndG(i)._2.narrow(1, offset + 1, length))
-              }
-              i += 1
-            }
-          })
-      )
+//      Engine.default.invokeAndWait(
+//        (0 until syncGradParallelNum).map(tid =>
+//          () => {
+//            val offset = tid * syncGradTaskSize + math.min(tid, syncGradExtraTask)
+//            val length = syncGradTaskSize + (if (tid < syncGradExtraTask) 1 else 0)
+//            var i = 0
+//            while (i < parallelism) {
+//              if (i == 0) {
+//                grad.narrow(1, offset + 1, length)
+//                  .copy(workingModelWAndG(i)._2.narrow(1, offset + 1, length))
+//              } else {
+//                grad.narrow(1, offset + 1, length)
+//                  .add(workingModelWAndG(i)._2.narrow(1, offset + 1, length))
+//              }
+//              i += 1
+//            }
+//          })
+//      )
       val loss = lossSum / parallelism
-      var scale = ev.fromType(parallelism)
-      if (gradientClippingParams.enableL2NormClipping) {
-        val squares = new Array[Double](syncGradParallelNum)
-        Engine.default.invokeAndWait((0 until syncGradParallelNum).map(tid => () => {
-          val offset = tid * syncGradTaskSize + math.min(tid, syncGradExtraTask)
-          val length = syncGradTaskSize + (if (tid < syncGradExtraTask) 1 else 0)
-          squares(tid) = ev.toType[Double](grad.narrow(1, offset + 1, length).sumSquare())
-        }))
-        var sum = 0.0
-        var i = 0
-        while (i < squares.size) {
-          sum += squares(i)
-          i += 1
-        }
-        val l2Norm = (math.sqrt(sum) / parallelism).toFloat
-
-        if (l2Norm > gradientClippingParams.normValueClip) {
-          scale = ev.fromType[Float]((l2Norm * parallelism) / gradientClippingParams.normValueClip)
-        }
-      }
-      grad.div(scale)
-
-      if (gradientClippingParams.enableConstantClipping) {
-        grad.clamp(gradientClippingParams.minValueClip, gradientClippingParams.maxValueClip)
-      }
+//      var scale = ev.fromType(parallelism)
+//      if (gradientClippingParams.enableL2NormClipping) {
+//        val squares = new Array[Double](syncGradParallelNum)
+//        Engine.default.invokeAndWait((0 until syncGradParallelNum).map(tid => () => {
+//          val offset = tid * syncGradTaskSize + math.min(tid, syncGradExtraTask)
+//          val length = syncGradTaskSize + (if (tid < syncGradExtraTask) 1 else 0)
+//          squares(tid) = ev.toType[Double](grad.narrow(1, offset + 1, length).sumSquare())
+//        }))
+//        var sum = 0.0
+//        var i = 0
+//        while (i < squares.size) {
+//          sum += squares(i)
+//          i += 1
+//        }
+//        val l2Norm = (math.sqrt(sum) / parallelism).toFloat
+//
+//        if (l2Norm > gradientClippingParams.normValueClip) {
+//          scale = ev.fromType[Float]((l2Norm * parallelism) / gradientClippingParams.normValueClip)
+//        }
+//      }
+//      grad.div(scale)
+//
+//      if (gradientClippingParams.enableConstantClipping) {
+//        grad.clamp(gradientClippingParams.minValueClip, gradientClippingParams.maxValueClip)
+//      }
       optimMethod.state.update("epoch", state.get("epoch"))
       optimMethod.state.update("neval", state.get("neval"))
-      optimMethod.optimize(_ => (ev.fromType(loss), grad), weight)
+//      optimMethod.optimize(_ => (ev.fromType(loss), grad), weight)
       val end = System.nanoTime()
       wallClockTime += end - start
       count += batch.size()

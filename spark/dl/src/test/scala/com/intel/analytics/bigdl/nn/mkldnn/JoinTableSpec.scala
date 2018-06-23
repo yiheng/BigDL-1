@@ -42,14 +42,17 @@ class JoinTableSpec extends BigDLSpecHelper {
       T(1, 2),
       T(3, 4)
     )))
-    model.backward(Tensor[Float](T(T(1, 2), T(3, 4))), T(
+    val dnnGrad = model.backward(Tensor[Float](T(T(1, 2), T(3, 4))), T(
       Tensor[Float](T(
         T(4, 5),
         T(6, 7),
         T(1, 3),
         T(4, 2)
       ))
-    )) should be(
+    )).asInstanceOf[Tensor[Float]]
+    val heapGrad = Tensor[Float](2, 2)
+    heapGrad.copy(dnnGrad)
+    heapGrad should be(
       Tensor[Float](T(T(5, 8), T(10, 9)))
     )
   }

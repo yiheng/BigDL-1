@@ -105,7 +105,7 @@ class ParallelAdam[@specialized(Float, Double) T: ClassTag](
 
     ParallelAdam.logger.
       info(s"update ${parameter.nElement()} parameters, maximum time is ${times.max} ms")
-    ParallelAdam.logger.info(s"Time is ${times.mkString("\t")} ms")
+    ParallelAdam.logger.info(s"Time is ${times.sortWith((a, b) => a > b).mkString("\t")} ms")
 
 
     state("evalCounter") = timestep // A tmp tensor to hold the sqrt(v) + epsilon

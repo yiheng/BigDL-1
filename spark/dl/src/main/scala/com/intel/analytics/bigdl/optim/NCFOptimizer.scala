@@ -131,9 +131,11 @@ class NCFOptimizer[T: ClassTag] (
       }
       val dataFetchTime = System.nanoTime()
       println("dataFetch")
+      val modelTimeArray = new Array[Long](parallelism)
       val lossSum = Engine.default.invokeAndWait(
         (0 until parallelism).map(i =>
           () => {
+            val start = System.nanoTime()
             val localEmbedding = workingEmbeddingModels(i)
             val localLinears = workingLinears(i)
 //            localEmbedding.zeroGradParameters()
@@ -150,9 +152,13 @@ class NCFOptimizer[T: ClassTag] (
             val errors = localCriterion.backward(output, target)
             localEmbedding.updateGradInput(input,
               localLinears.backward(localEmbedding.output, errors))
+            modelTimeArray(i) = System.nanoTime() - start
             _loss
           })
       ).sum
+
+      logger.info(s"Max model time is ${modelTimeArray.max}," +
+        s"Time is ${modelTimeArray.sortWith((a, b) => a > b).mkString("\t")} ms")
 
       val loss = lossSum / parallelism
 
